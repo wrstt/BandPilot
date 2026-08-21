@@ -14,13 +14,13 @@
       <Border Padding="12,9,12,5">
         <StackPanel Orientation="Horizontal">
           <TextBlock Text="{Binding Ssid}" FontSize="12.5" FontWeight="SemiBold"
-                     Foreground="{StaticResource B.Heading}" VerticalAlignment="Center"/>
+                     Foreground="{DynamicResource B.Heading}" VerticalAlignment="Center"/>
           <TextBlock Text="{Binding CountLabel}" Margin="8,0,0,0" FontSize="11"
-                     Foreground="{StaticResource B.TextFaint}" VerticalAlignment="Center"/>
+                     Foreground="{DynamicResource B.TextFaint}" VerticalAlignment="Center"/>
           <Border Visibility="{Binding ConnectedVisibility}" Margin="8,0,0,0"
                   CornerRadius="99" Padding="7,2" VerticalAlignment="Center"
-                  BorderThickness="1" BorderBrush="{StaticResource B.Accent}">
-            <TextBlock Text="connected" FontSize="10" Foreground="{StaticResource B.Accent}"/>
+                  BorderThickness="1" BorderBrush="{DynamicResource B.Accent}">
+            <TextBlock Text="connected" FontSize="10" Foreground="{DynamicResource B.Accent}"/>
           </Border>
         </StackPanel>
       </Border>
@@ -33,10 +33,11 @@
           <ColumnDefinition Width="38"/>
           <ColumnDefinition Width="62"/>
           <ColumnDefinition Width="44"/>
-          <ColumnDefinition Width="96"/>
-          <ColumnDefinition Width="*" MinWidth="120"/>
-          <ColumnDefinition Width="96"/>
-          <ColumnDefinition Width="112"/>
+          <ColumnDefinition Width="64"/>
+          <ColumnDefinition Width="92"/>
+          <ColumnDefinition Width="*" MinWidth="110"/>
+          <ColumnDefinition Width="92"/>
+          <ColumnDefinition Width="104"/>
         </Grid.ColumnDefinitions>
 
         <!-- band pill -->
@@ -55,24 +56,31 @@
         <TextBlock Grid.Column="3" Text="{Binding Dbm}" Style="{StaticResource T.Secondary}"
                    FontSize="12" HorizontalAlignment="Right" Margin="0,0,8,0"/>
 
-        <TextBlock Grid.Column="4" Text="{Binding Generation}" Style="{StaticResource T.Secondary}"
+        <!-- Five minutes of RSSI, so a steady radio can be told from a lucky reading. -->
+        <Polyline Grid.Column="4" Points="{Binding SparklinePoints}"
+                  Visibility="{Binding SparklineVisibility}"
+                  Stroke="{Binding SparklineBrush}" StrokeThickness="1.4"
+                  StrokeLineJoin="Round" VerticalAlignment="Center"
+                  Margin="0,0,6,0" ToolTip="{Binding SparklineTooltip}"/>
+
+        <TextBlock Grid.Column="5" Text="{Binding Generation}" Style="{StaticResource T.Secondary}"
                    FontSize="12"/>
 
-        <TextBox Grid.Column="5" Text="{Binding Bssid, Mode=OneWay}" IsReadOnly="True"
+        <TextBox Grid.Column="6" Text="{Binding Bssid, Mode=OneWay}" IsReadOnly="True"
                  BorderThickness="0" Background="Transparent" Padding="0"
                  FontFamily="{StaticResource F.Mono}" FontSize="11.5"
-                 Foreground="{StaticResource B.TextSecondary}" VerticalAlignment="Center"
+                 Foreground="{DynamicResource B.TextSecondary}" VerticalAlignment="Center"
                  Cursor="IBeam" ToolTip="Select to copy"/>
 
         <!-- rating: mini bar plus number, both in the threshold colour -->
-        <Grid Grid.Column="6" VerticalAlignment="Center">
+        <Grid Grid.Column="7" VerticalAlignment="Center">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="Auto"/>
           </Grid.ColumnDefinitions>
           <!-- Fixed track width so the fill can be a simple fraction of it. -->
           <Border Grid.Column="0" Width="52" Height="4" CornerRadius="2" VerticalAlignment="Center"
-                  Margin="0,0,9,0" Background="{StaticResource B.RowRule}">
+                  Margin="0,0,9,0" Background="{DynamicResource B.RowRule}">
             <Border HorizontalAlignment="Left" Height="4" CornerRadius="2"
                     Background="{Binding RatingBrush}" Width="{Binding RatingBarWidth}"/>
           </Border>
@@ -80,7 +88,7 @@
                      Foreground="{Binding RatingBrush}" VerticalAlignment="Center"/>
         </Grid>
 
-        <Border Grid.Column="7" Visibility="{Binding ChipVisibility}" CornerRadius="99"
+        <Border Grid.Column="8" Visibility="{Binding ChipVisibility}" CornerRadius="99"
                 Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Center"
                 BorderThickness="1" BorderBrush="{Binding ChipBrush}">
           <TextBlock Text="{Binding ChipText}" FontSize="10" Foreground="{Binding ChipBrush}"/>
@@ -101,15 +109,15 @@
             </Border>
             <ControlTemplate.Triggers>
               <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="{StaticResource B.RowConnected}"/>
-                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource B.Accent}"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.RowConnected}"/>
+                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource B.Accent}"/>
               </DataTrigger>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="{StaticResource B.RowHover}"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.RowHover}"/>
               </Trigger>
               <Trigger Property="IsSelected" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="{StaticResource B.RowSelected}"/>
-                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource B.Accent2}"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.RowSelected}"/>
+                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource B.Accent2}"/>
               </Trigger>
               <DataTrigger Binding="{Binding IsHeader}" Value="True">
                 <Setter Property="Focusable" Value="False"/>
@@ -138,9 +146,9 @@
         <ComboBox x:Name="AdapterBox" Style="{StaticResource Input.Combo}" Width="250"
                   SelectionChanged="OnAdapterChanged"/>
         <Border x:Name="CapChipWrap" CornerRadius="99" Padding="9,3" Margin="9,0,0,0"
-                VerticalAlignment="Center" Background="{StaticResource B.Accent2Tint}">
+                VerticalAlignment="Center" Background="{DynamicResource B.Accent2Tint}">
           <TextBlock x:Name="CapChip" FontSize="10.5" FontWeight="SemiBold"
-                     Foreground="{StaticResource B.Accent2}"/>
+                     Foreground="{DynamicResource B.Accent2}"/>
         </Border>
         <CheckBox x:Name="OnlyMine" Style="{StaticResource Input.Check}" Margin="14,0,0,0"
                   Content="Only my network" IsChecked="True" Click="OnFilterToggled"/>
@@ -152,15 +160,15 @@
       <StackPanel>
         <StackPanel Orientation="Horizontal">
           <TextBlock x:Name="BannerSsid" FontSize="16.5" FontWeight="SemiBold"
-                     Foreground="{StaticResource B.Heading}" VerticalAlignment="Center"/>
+                     Foreground="{DynamicResource B.Heading}" VerticalAlignment="Center"/>
           <Border x:Name="BannerPillWrap" CornerRadius="99" Padding="9,2" Margin="10,0,0,0"
                   VerticalAlignment="Center" BorderThickness="1"
-                  BorderBrush="{StaticResource B.Accent}">
+                  BorderBrush="{DynamicResource B.Accent}">
             <StackPanel Orientation="Horizontal">
-              <Ellipse x:Name="BannerDot" Width="6" Height="6" Fill="{StaticResource B.Accent}"
+              <Ellipse x:Name="BannerDot" Width="6" Height="6" Fill="{DynamicResource B.Accent}"
                        VerticalAlignment="Center"/>
               <TextBlock x:Name="BannerPill" Margin="6,0,0,0" FontSize="10.5"
-                         Foreground="{StaticResource B.Accent}"/>
+                         Foreground="{DynamicResource B.Accent}"/>
             </StackPanel>
           </Border>
         </StackPanel>
@@ -195,13 +203,13 @@
             <TextBlock Text="ACCESS POINT" Style="{StaticResource T.Kicker}"/>
             <TextBox x:Name="StatBssid" IsReadOnly="True" BorderThickness="0" Background="Transparent"
                      Padding="0" Margin="0,3,0,0" FontFamily="{StaticResource F.Mono}" FontSize="12"
-                     Foreground="{StaticResource B.Text}" Cursor="IBeam"/>
+                     Foreground="{DynamicResource B.Text}" Cursor="IBeam"/>
           </StackPanel>
         </Grid>
 
         <!-- the verdict: the reason this app exists -->
         <Border x:Name="VerdictWrap" Margin="0,13,0,0" CornerRadius="8" Padding="12,9"
-                Background="{StaticResource B.Background}" Visibility="Collapsed">
+                Background="{DynamicResource B.Background}" Visibility="Collapsed">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="3"/>
@@ -209,10 +217,10 @@
               <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Border x:Name="VerdictRail" Grid.Column="0" CornerRadius="2"
-                    Background="{StaticResource B.WarnRail}"/>
+                    Background="{DynamicResource B.WarnRail}"/>
             <TextBlock x:Name="VerdictText" Grid.Column="1" Margin="11,0,10,0" FontSize="12"
                        LineHeight="17" TextWrapping="Wrap" VerticalAlignment="Center"
-                       Foreground="{StaticResource B.TextSecondary}"/>
+                       Foreground="{DynamicResource B.TextSecondary}"/>
             <Button x:Name="BtnSwitch" Grid.Column="2" Style="{StaticResource Btn.Ghost}"
                     VerticalAlignment="Center" Visibility="Collapsed" Click="OnSwitchToBest"/>
           </Grid>
@@ -230,7 +238,7 @@
         </Grid.RowDefinitions>
 
         <!-- header -->
-        <Border Grid.Row="0" BorderBrush="{StaticResource B.Hairline}" BorderThickness="0,0,0,1"
+        <Border Grid.Row="0" BorderBrush="{DynamicResource B.Hairline}" BorderThickness="0,0,0,1"
                 Padding="12,10">
           <Grid>
             <Grid.ColumnDefinitions>
@@ -238,10 +246,11 @@
               <ColumnDefinition Width="38"/>
               <ColumnDefinition Width="62"/>
               <ColumnDefinition Width="44"/>
-              <ColumnDefinition Width="96"/>
-              <ColumnDefinition Width="*" MinWidth="120"/>
-              <ColumnDefinition Width="96"/>
-              <ColumnDefinition Width="112"/>
+              <ColumnDefinition Width="64"/>
+              <ColumnDefinition Width="92"/>
+              <ColumnDefinition Width="*" MinWidth="110"/>
+              <ColumnDefinition Width="92"/>
+              <ColumnDefinition Width="104"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="BAND" Style="{StaticResource T.Kicker}"/>
             <TextBlock Grid.Column="1" Text="CH" Style="{StaticResource T.Kicker}"
@@ -249,9 +258,10 @@
             <TextBlock Grid.Column="2" Text="SIGNAL" Style="{StaticResource T.Kicker}"/>
             <TextBlock Grid.Column="3" Text="DBM" Style="{StaticResource T.Kicker}"
                        HorizontalAlignment="Right" Margin="0,0,8,0"/>
-            <TextBlock Grid.Column="4" Text="GENERATION" Style="{StaticResource T.Kicker}"/>
-            <TextBlock Grid.Column="5" Text="ACCESS POINT (BSSID)" Style="{StaticResource T.Kicker}"/>
-            <TextBlock Grid.Column="6" Text="RATING" Style="{StaticResource T.Kicker}"/>
+            <TextBlock Grid.Column="4" Text="TREND" Style="{StaticResource T.Kicker}"/>
+            <TextBlock Grid.Column="5" Text="GENERATION" Style="{StaticResource T.Kicker}"/>
+            <TextBlock Grid.Column="6" Text="ACCESS POINT (BSSID)" Style="{StaticResource T.Kicker}"/>
+            <TextBlock Grid.Column="7" Text="RATING" Style="{StaticResource T.Kicker}"/>
           </Grid>
         </Border>
 
@@ -264,25 +274,25 @@
 
         <!-- empty state -->
         <Border x:Name="EmptyState" Grid.Row="1" Visibility="Collapsed" Margin="16"
-                Background="{StaticResource B.Surface}"
-                CornerRadius="10" BorderThickness="1" BorderBrush="{StaticResource B.Hairline}">
+                Background="{DynamicResource B.Surface}"
+                CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource B.Hairline}">
           <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
             <Path Style="{StaticResource Icon}" Data="{StaticResource I.WifiOff}"
-                  Width="26" Height="26" Stroke="{StaticResource B.TextFaint}"
+                  Width="26" Height="26" Stroke="{DynamicResource B.TextFaint}"
                   HorizontalAlignment="Center"/>
             <TextBlock x:Name="EmptyTitle" Text="No networks in range" Margin="0,11,0,0"
                        FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"
-                       Foreground="{StaticResource B.TextSecondary}"/>
+                       Foreground="{DynamicResource B.TextSecondary}"/>
             <TextBlock x:Name="EmptyBody" Text="Move closer to an access point, or rescan."
                        Margin="0,5,0,0" FontSize="12" HorizontalAlignment="Center"
-                       Foreground="{StaticResource B.TextFaint}"/>
+                       Foreground="{DynamicResource B.TextFaint}"/>
           </StackPanel>
         </Border>
 
         <!-- scan progress, pinned to the card's bottom edge -->
         <ProgressBar x:Name="ScanBar" Grid.Row="2" Height="2" IsIndeterminate="True"
                      Visibility="Collapsed" BorderThickness="0"
-                     Background="Transparent" Foreground="{StaticResource B.Accent2}"/>
+                     Background="Transparent" Foreground="{DynamicResource B.Accent2}"/>
       </Grid>
     </Border>
 
@@ -292,9 +302,13 @@
         <Button x:Name="BtnRescan" Style="{StaticResource Btn.Secondary}" Content="Rescan"
                 MinWidth="104" Click="OnRescan"/>
         <TextBlock x:Name="StatusLine" Style="{StaticResource T.Dim}" FontSize="11.5"
-                   Margin="13,0,0,0" VerticalAlignment="Center"/>
+                   Margin="13,0,0,0" VerticalAlignment="Center" MaxWidth="300"
+                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button x:Name="BtnHold" Style="{StaticResource Btn.Secondary}" Content="Hold this radio"
+                Margin="0,0,9,0" Click="OnHoldRadio"
+                ToolTip="Calm the driver's roaming so Windows stops drifting off your choice"/>
         <Button x:Name="BtnAuto" Style="{StaticResource Btn.Secondary}" Content="Back to automatic"
                 Click="OnBackToAuto"/>
         <Button x:Name="BtnConnect" Style="{StaticResource Btn.Primary}" Margin="9,0,0,0"

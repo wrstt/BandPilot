@@ -30,6 +30,21 @@ namespace BandPilot.Ui
             PageHost.Content = _bands;
 
             RefreshQosIndicator();
+            RefreshThemeButton();
+        }
+
+        private void OnThemeClick(object sender, RoutedEventArgs e)
+        {
+            ThemeManager.Toggle();
+            RefreshThemeButton();
+        }
+
+        private void RefreshThemeButton()
+        {
+            bool dark = ThemeManager.Current == AppTheme.Dark;
+            // The button offers the other theme, so it shows the other icon.
+            ThemeIcon.Data = (System.Windows.Media.Geometry)FindResource(dark ? "I.Sun" : "I.Moon");
+            ThemeLabel.Text = dark ? "Light theme" : "Dark theme";
         }
 
         // ------------------------------------------------------------------

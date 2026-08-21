@@ -16,10 +16,10 @@
                   VerticalAlignment="Center" Visibility="Collapsed">
         <TextBlock Text="Down" Style="{StaticResource T.Dim}" FontSize="12"/>
         <TextBlock x:Name="TotalDown" Margin="6,0,0,0" FontSize="12.5" FontWeight="SemiBold"
-                   Foreground="{StaticResource B.Accent}" VerticalAlignment="Center"/>
+                   Foreground="{DynamicResource B.Accent}" VerticalAlignment="Center"/>
         <TextBlock Text="Up" Style="{StaticResource T.Dim}" FontSize="12" Margin="16,0,0,0"/>
         <TextBlock x:Name="TotalUp" Margin="6,0,0,0" FontSize="12.5" FontWeight="SemiBold"
-                   Foreground="{StaticResource B.Good}" VerticalAlignment="Center"/>
+                   Foreground="{DynamicResource B.Good}" VerticalAlignment="Center"/>
         <TextBlock x:Name="ProcCount" Style="{StaticResource T.Dim}" FontSize="12" Margin="16,0,0,0"/>
       </StackPanel>
     </Grid>
@@ -31,7 +31,7 @@
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Border x:Name="TableHeader" Grid.Row="0" BorderBrush="{StaticResource B.Hairline}"
+        <Border x:Name="TableHeader" Grid.Row="0" BorderBrush="{DynamicResource B.Hairline}"
                 BorderThickness="0,0,0,1" Padding="14,10" Visibility="Collapsed">
           <Grid>
             <Grid.ColumnDefinitions>
@@ -66,10 +66,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                       <Trigger Property="IsMouseOver" Value="True">
-                        <Setter TargetName="bd" Property="Background" Value="{StaticResource B.RowHover}"/>
+                        <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.RowHover}"/>
                       </Trigger>
                       <Trigger Property="IsSelected" Value="True">
-                        <Setter TargetName="bd" Property="Background" Value="{StaticResource B.RowSelected}"/>
+                        <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.RowSelected}"/>
                       </Trigger>
                     </ControlTemplate.Triggers>
                   </ControlTemplate>
@@ -93,9 +93,9 @@
                 <TextBlock Grid.Column="1" Text="{Binding Pid}" Style="{StaticResource T.Secondary}"
                            FontSize="12" HorizontalAlignment="Right"/>
                 <TextBlock Grid.Column="2" Text="{Binding Down}" FontSize="12" VerticalAlignment="Center"
-                           HorizontalAlignment="Right" Foreground="{StaticResource B.Accent}"/>
+                           HorizontalAlignment="Right" Foreground="{DynamicResource B.Accent}"/>
                 <TextBlock Grid.Column="3" Text="{Binding Up}" FontSize="12" VerticalAlignment="Center"
-                           HorizontalAlignment="Right" Foreground="{StaticResource B.Good}"/>
+                           HorizontalAlignment="Right" Foreground="{DynamicResource B.Good}"/>
                 <TextBlock Grid.Column="4" Text="{Binding TotalDown}" Style="{StaticResource T.Dim}"
                            FontSize="12" HorizontalAlignment="Right"/>
                 <TextBlock Grid.Column="5" Text="{Binding TotalUp}" Style="{StaticResource T.Dim}"
@@ -106,17 +106,17 @@
         </ListBox>
 
         <Border x:Name="OffState" Grid.Row="1" Margin="16" CornerRadius="10"
-                Background="{StaticResource B.Surface}"
-                BorderThickness="1" BorderBrush="{StaticResource B.Hairline}">
+                Background="{DynamicResource B.Surface}"
+                BorderThickness="1" BorderBrush="{DynamicResource B.Hairline}">
           <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
             <Path Style="{StaticResource Icon}" Data="{StaticResource I.Pulse}" Width="26" Height="26"
-                  Stroke="{StaticResource B.TextFaint}" HorizontalAlignment="Center"/>
+                  Stroke="{DynamicResource B.TextFaint}" HorizontalAlignment="Center"/>
             <TextBlock x:Name="OffTitle" Text="Monitoring is off" Margin="0,11,0,0" FontSize="13"
                        FontWeight="SemiBold" HorizontalAlignment="Center"
-                       Foreground="{StaticResource B.TextSecondary}"/>
+                       Foreground="{DynamicResource B.TextSecondary}"/>
             <TextBlock x:Name="OffBody" Margin="0,5,0,0" FontSize="12" HorizontalAlignment="Center"
                        TextAlignment="Center" MaxWidth="420" TextWrapping="Wrap"
-                       Foreground="{StaticResource B.TextFaint}"
+                       Foreground="{DynamicResource B.TextFaint}"
                        Text="Start monitoring to see per-process bandwidth, updated every second."/>
           </StackPanel>
         </Border>

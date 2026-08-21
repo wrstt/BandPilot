@@ -28,17 +28,17 @@
     <!-- Explains the link between this page and the Bands page, which is
          otherwise invisible: pinning is temporary, roaming is what holds it. -->
     <Border Grid.Row="2" Margin="0,13,0,0" CornerRadius="8" Padding="12,10"
-            Background="{StaticResource B.Accent2Tint}">
+            Background="{DynamicResource B.Accent2Tint}">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="3"/>
           <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <Border Grid.Column="0" CornerRadius="2" Background="{StaticResource B.Accent2}"/>
+        <Border Grid.Column="0" CornerRadius="2" Background="{DynamicResource B.Accent2}"/>
         <TextBlock Grid.Column="1" Margin="11,0,0,0" FontSize="12" LineHeight="17"
-                   TextWrapping="Wrap" Foreground="{StaticResource B.TextSecondary}">
+                   TextWrapping="Wrap" Foreground="{DynamicResource B.TextSecondary}">
           <Run Text="A radio pinned on Bands &amp; APs lasts only for the current connection. "/>
-          <Run Text="Roaming Aggressiveness" FontWeight="SemiBold" Foreground="{StaticResource B.Accent}"/>
+          <Run Text="Roaming Aggressiveness" FontWeight="SemiBold" Foreground="{DynamicResource B.Accent}"/>
           <Run Text=" is what stops Windows drifting back — set it to the lowest value to hold your choice."/>
         </TextBlock>
       </Grid>
@@ -51,7 +51,7 @@
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" BorderBrush="{StaticResource B.Hairline}" BorderThickness="0,0,0,1"
+        <Border Grid.Row="0" BorderBrush="{DynamicResource B.Hairline}" BorderThickness="0,0,0,1"
                 Padding="14,10">
           <Grid>
             <Grid.ColumnDefinitions>
@@ -82,11 +82,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                       <Trigger Property="IsMouseOver" Value="True">
-                        <Setter TargetName="bd" Property="Background" Value="{StaticResource B.RowHover}"/>
+                        <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.RowHover}"/>
                       </Trigger>
                       <Trigger Property="IsSelected" Value="True">
-                        <Setter TargetName="bd" Property="Background" Value="{StaticResource B.RowSelected}"/>
-                        <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource B.Accent2}"/>
+                        <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.RowSelected}"/>
+                        <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource B.Accent2}"/>
                       </Trigger>
                     </ControlTemplate.Triggers>
                   </ControlTemplate>
@@ -109,7 +109,7 @@
                 <TextBox Grid.Column="2" Text="{Binding RegistryKeyword, Mode=OneWay}" IsReadOnly="True"
                          BorderThickness="0" Background="Transparent" Padding="0"
                          FontFamily="{StaticResource F.Mono}" FontSize="11.5"
-                         Foreground="{StaticResource B.TextFaint}" VerticalAlignment="Center"
+                         Foreground="{DynamicResource B.TextFaint}" VerticalAlignment="Center"
                          Cursor="IBeam"/>
               </Grid>
             </DataTemplate>

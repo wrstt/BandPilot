@@ -10,56 +10,10 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-  <!-- ============================ colours ============================ -->
-  <Color x:Key="C.Background">#EEF5F3</Color>
-  <Color x:Key="C.Surface">#FFFFFF</Color>
-  <Color x:Key="C.Text">#1C3A3E</Color>
-  <Color x:Key="C.Heading">#14484F</Color>
-  <Color x:Key="C.TextSecondary">#42605F</Color>
-  <Color x:Key="C.TextDim">#5F7A7D</Color>
-  <Color x:Key="C.TextFaint">#7A938F</Color>
-  <Color x:Key="C.Accent">#0E7490</Color>
-  <Color x:Key="C.Accent2">#0D9488</Color>
-  <Color x:Key="C.Good">#15803D</Color>
-  <Color x:Key="C.WarnText">#B45309</Color>
-  <Color x:Key="C.WarnRail">#CA8A04</Color>
-  <Color x:Key="C.Bad">#B91C1C</Color>
-  <Color x:Key="C.Band6">#0F766E</Color>
-  <Color x:Key="C.Band5">#0E7490</Color>
-  <Color x:Key="C.Band24">#5B7280</Color>
-  <Color x:Key="C.CloseHover">#D05D5D</Color>
-
-  <SolidColorBrush x:Key="B.Background" Color="{StaticResource C.Background}"/>
-  <SolidColorBrush x:Key="B.Surface" Color="{StaticResource C.Surface}"/>
-  <SolidColorBrush x:Key="B.Text" Color="{StaticResource C.Text}"/>
-  <SolidColorBrush x:Key="B.Heading" Color="{StaticResource C.Heading}"/>
-  <SolidColorBrush x:Key="B.TextSecondary" Color="{StaticResource C.TextSecondary}"/>
-  <SolidColorBrush x:Key="B.TextDim" Color="{StaticResource C.TextDim}"/>
-  <SolidColorBrush x:Key="B.TextFaint" Color="{StaticResource C.TextFaint}"/>
-  <SolidColorBrush x:Key="B.Accent" Color="{StaticResource C.Accent}"/>
-  <SolidColorBrush x:Key="B.Accent2" Color="{StaticResource C.Accent2}"/>
-  <SolidColorBrush x:Key="B.Good" Color="{StaticResource C.Good}"/>
-  <SolidColorBrush x:Key="B.WarnText" Color="{StaticResource C.WarnText}"/>
-  <SolidColorBrush x:Key="B.WarnRail" Color="{StaticResource C.WarnRail}"/>
-  <SolidColorBrush x:Key="B.Bad" Color="{StaticResource C.Bad}"/>
-  <SolidColorBrush x:Key="B.Band6" Color="{StaticResource C.Band6}"/>
-  <SolidColorBrush x:Key="B.Band5" Color="{StaticResource C.Band5}"/>
-  <SolidColorBrush x:Key="B.Band24" Color="{StaticResource C.Band24}"/>
-  <SolidColorBrush x:Key="B.CloseHover" Color="{StaticResource C.CloseHover}"/>
-
-  <SolidColorBrush x:Key="B.Band6Bg" Color="{StaticResource C.Band6}" Opacity="0.10"/>
-  <SolidColorBrush x:Key="B.Band5Bg" Color="{StaticResource C.Band5}" Opacity="0.10"/>
-  <SolidColorBrush x:Key="B.Band24Bg" Color="{StaticResource C.Band24}" Opacity="0.10"/>
-
-  <SolidColorBrush x:Key="B.Hairline" Color="{StaticResource C.Text}" Opacity="0.10"/>
-  <SolidColorBrush x:Key="B.RowRule" Color="{StaticResource C.Text}" Opacity="0.06"/>
-  <SolidColorBrush x:Key="B.RowHover" Color="{StaticResource C.Accent2}" Opacity="0.05"/>
-  <SolidColorBrush x:Key="B.RowSelected" Color="{StaticResource C.Accent2}" Opacity="0.08"/>
-  <SolidColorBrush x:Key="B.RowConnected" Color="{StaticResource C.Accent}" Opacity="0.06"/>
-  <SolidColorBrush x:Key="B.AccentTint" Color="{StaticResource C.Accent}" Opacity="0.10"/>
-  <SolidColorBrush x:Key="B.Accent2Tint" Color="{StaticResource C.Accent2}" Opacity="0.10"/>
-  <SolidColorBrush x:Key="B.WarnTint" Color="{StaticResource C.WarnRail}" Opacity="0.10"/>
-  <SolidColorBrush x:Key="B.Overlay" Color="{StaticResource C.Text}" Opacity="0.35"/>
+  <!-- Colour tokens live in Palette.Light.xaml / Palette.Dark.xaml, merged
+       ahead of this dictionary. Everything below refers to them with
+       DynamicResource so a palette swap repaints the running window instead of
+       needing a restart. -->
 
   <!-- ========================== typography =========================== -->
   <!-- Inter is the design font; Segoe UI is the guaranteed Windows fallback. -->
@@ -75,23 +29,23 @@
     <Setter Property="FontFamily" Value="{StaticResource F.Sans}"/>
     <Setter Property="FontSize" Value="19"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Heading}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Heading}"/>
     <Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/>
   </Style>
 
   <Style x:Key="T.Body" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{StaticResource F.Sans}"/>
     <Setter Property="FontSize" Value="12.5"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Text}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
   </Style>
 
   <Style x:Key="T.Dim" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
-    <Setter Property="Foreground" Value="{StaticResource B.TextDim}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.TextDim}"/>
   </Style>
 
   <Style x:Key="T.Secondary" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
-    <Setter Property="Foreground" Value="{StaticResource B.TextSecondary}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.TextSecondary}"/>
   </Style>
 
   <!-- Small uppercase labels: table headers and the stat-row kickers. -->
@@ -99,7 +53,7 @@
     <Setter Property="FontFamily" Value="{StaticResource F.Sans}"/>
     <Setter Property="FontSize" Value="9.5"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
-    <Setter Property="Foreground" Value="{StaticResource B.TextFaint}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.TextFaint}"/>
     <Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/>
   </Style>
 
@@ -110,11 +64,11 @@
 
   <!-- =========================== surfaces ============================ -->
   <Style x:Key="Card" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource B.Surface}"/>
+    <Setter Property="Background" Value="{DynamicResource B.Surface}"/>
     <Setter Property="CornerRadius" Value="10"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="BorderBrush" Value="{StaticResource B.Hairline}"/>
-    <Setter Property="Effect" Value="{StaticResource E.Card}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Hairline}"/>
+    <Setter Property="Effect" Value="{DynamicResource E.Card}"/>
   </Style>
 
   <!-- ============================ buttons ============================ -->
@@ -150,31 +104,31 @@
 
   <Style x:Key="Btn.Primary" TargetType="Button" BasedOn="{StaticResource Btn.Base}">
     <Setter Property="Background" Value="Transparent"/>
-    <Setter Property="BorderBrush" Value="{StaticResource B.Accent}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Accent}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Accent}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Accent}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
   </Style>
 
   <Style x:Key="Btn.Secondary" TargetType="Button" BasedOn="{StaticResource Btn.Base}">
     <Setter Property="Background" Value="Transparent"/>
-    <Setter Property="BorderBrush" Value="{StaticResource B.Hairline}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Hairline}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Text}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
   </Style>
 
   <Style x:Key="Btn.Ghost" TargetType="Button" BasedOn="{StaticResource Btn.Base}">
     <Setter Property="Background" Value="Transparent"/>
     <Setter Property="BorderThickness" Value="0"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Accent}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Accent}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
   </Style>
 
   <Style x:Key="Btn.Danger" TargetType="Button" BasedOn="{StaticResource Btn.Base}">
     <Setter Property="Background" Value="Transparent"/>
-    <Setter Property="BorderBrush" Value="{StaticResource B.Bad}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Bad}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Bad}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Bad}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
   </Style>
 
@@ -183,7 +137,7 @@
     <Setter Property="Width" Value="42"/>
     <Setter Property="Height" Value="36"/>
     <Setter Property="Background" Value="Transparent"/>
-    <Setter Property="Foreground" Value="{StaticResource B.TextDim}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.TextDim}"/>
     <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
     <Setter Property="FontSize" Value="10"/>
     <Setter Property="Cursor" Value="Hand"/>
@@ -195,7 +149,7 @@
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="bd" Property="Background" Value="{StaticResource B.Hairline}"/>
+              <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.Hairline}"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -212,7 +166,7 @@
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="bd" Property="Background" Value="{StaticResource B.CloseHover}"/>
+              <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.CloseHover}"/>
               <Setter Property="Foreground" Value="White"/>
             </Trigger>
           </ControlTemplate.Triggers>
@@ -225,12 +179,12 @@
   <Style x:Key="Input.Text" TargetType="TextBox">
     <Setter Property="FontFamily" Value="{StaticResource F.Sans}"/>
     <Setter Property="FontSize" Value="12.5"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Text}"/>
-    <Setter Property="CaretBrush" Value="{StaticResource B.Text}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="CaretBrush" Value="{DynamicResource B.Text}"/>
     <Setter Property="Padding" Value="9,6"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Background" Value="{StaticResource B.Surface}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource B.Hairline}"/>
+    <Setter Property="Background" Value="{DynamicResource B.Surface}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Hairline}"/>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="TextBox">
@@ -248,17 +202,17 @@
   <Style x:Key="Input.Combo" TargetType="ComboBox">
     <Setter Property="FontFamily" Value="{StaticResource F.Sans}"/>
     <Setter Property="FontSize" Value="12.5"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Text}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
     <Setter Property="Padding" Value="9,5"/>
     <Setter Property="Height" Value="30"/>
-    <Setter Property="BorderBrush" Value="{StaticResource B.Hairline}"/>
-    <Setter Property="Background" Value="{StaticResource B.Surface}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Hairline}"/>
+    <Setter Property="Background" Value="{DynamicResource B.Surface}"/>
   </Style>
 
   <Style x:Key="Input.Check" TargetType="CheckBox">
     <Setter Property="FontFamily" Value="{StaticResource F.Sans}"/>
     <Setter Property="FontSize" Value="12.5"/>
-    <Setter Property="Foreground" Value="{StaticResource B.Text}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
     <Setter Property="VerticalContentAlignment" Value="Center"/>
     <Setter Property="Cursor" Value="Hand"/>
   </Style>
@@ -273,10 +227,12 @@
   <Geometry x:Key="I.Sliders">M3,7 H21 M3,12 H21 M3,17 H21 M8,5.6 A1.4,1.4 0 1,1 7.99,5.6 Z M15,10.6 A1.4,1.4 0 1,1 14.99,10.6 Z M10,15.6 A1.4,1.4 0 1,1 9.99,15.6 Z</Geometry>
   <Geometry x:Key="I.Pulse">M2,12 H7 L10,5 L14,19 L17,12 H22</Geometry>
   <Geometry x:Key="I.Info">M12,3 A9,9 0 1,1 11.99,3 Z M12,11.2 V16.6 M12,7.4 V8.6</Geometry>
+  <Geometry x:Key="I.Sun">M12,5.2 A6.8,6.8 0 1,1 11.99,5.2 Z M12,1.5 V3.2 M12,20.8 V22.5 M1.5,12 H3.2 M20.8,12 H22.5 M4.6,4.6 L5.8,5.8 M18.2,18.2 L19.4,19.4 M19.4,4.6 L18.2,5.8 M5.8,18.2 L4.6,19.4</Geometry>
+  <Geometry x:Key="I.Moon">M20.5,14.6 A9,9 0 1,1 9.4,3.5 A7.2,7.2 0 0,0 20.5,14.6 Z</Geometry>
   <Geometry x:Key="I.WifiOff">M2.5,8.5 C4.6,6.7 7.4,5.6 10.3,5.2 M16.2,6.3 C18.2,6.9 20.1,7.6 21.5,8.5 M6,12 C7.2,11 8.7,10.3 10.3,10 M15.6,11 C16.5,11.3 17.3,11.6 18,12 M9.5,15.4 C10.3,14.7 11.4,14.3 12.5,14.3 M11,18.6 A1,1 0 1,1 13,18.6 A1,1 0 1,1 11,18.6 Z M3,3 L21,21</Geometry>
 
   <Style x:Key="Icon" TargetType="Path">
-    <Setter Property="Stroke" Value="{StaticResource B.TextDim}"/>
+    <Setter Property="Stroke" Value="{DynamicResource B.TextDim}"/>
     <Setter Property="StrokeThickness" Value="1.4"/>
     <Setter Property="StrokeStartLineCap" Value="Round"/>
     <Setter Property="StrokeEndLineCap" Value="Round"/>
@@ -302,19 +258,19 @@
                     Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
               <TextBlock x:Name="tx" Margin="10,0,0,0" VerticalAlignment="Center"
                          FontFamily="{StaticResource F.Sans}" FontSize="12.5"
-                         Foreground="{StaticResource B.TextSecondary}"
+                         Foreground="{DynamicResource B.TextSecondary}"
                          Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"/>
             </StackPanel>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="bd" Property="Background" Value="{StaticResource B.RowHover}"/>
+              <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.RowHover}"/>
             </Trigger>
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="bd" Property="Background" Value="{StaticResource B.AccentTint}"/>
-              <Setter TargetName="tx" Property="Foreground" Value="{StaticResource B.Accent}"/>
+              <Setter TargetName="bd" Property="Background" Value="{DynamicResource B.AccentTint}"/>
+              <Setter TargetName="tx" Property="Foreground" Value="{DynamicResource B.Accent}"/>
               <Setter TargetName="tx" Property="FontWeight" Value="SemiBold"/>
-              <Setter TargetName="ic" Property="Stroke" Value="{StaticResource B.Accent}"/>
+              <Setter TargetName="ic" Property="Stroke" Value="{DynamicResource B.Accent}"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

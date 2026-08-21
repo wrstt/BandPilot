@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using BandPilot.Native;
+using BandPilot.Adapter;
 using BandPilot.Wifi;
 
 namespace BandPilot.Tests
@@ -34,6 +35,8 @@ namespace BandPilot.Tests
             BandMath();
             ScoreSanity();
             CapabilityRules();
+            RoamingLockRules();
+            SignalHistoryRules();
 
             Console.WriteLine();
             Console.WriteLine(_failures == 0
@@ -113,6 +116,123 @@ namespace BandPilot.Tests
             shortList.dot11PhyTypes[5] = Dot11PhyType.Eht;   // beyond the count
             Eq("ignores entries past the reported count",
                 (int)AdapterCapability.FromNative(shortList).MaxPhy, (int)Dot11PhyType.Ht);
+        }
+
+        /// <summary>
+        /// The roaming control has a different name and a different value set on
+        /// every vendor's driver, so this picks the calmest option by inspection.
+        /// Choosing wrongly here does the opposite of what the button promises:
+        /// it would make the adapter roam harder, off the AP the user just pinned.
+        /// </summary>
+        private static void RoamingLockRules()
+        {
+            Section("Roaming lockdown - calmest value");
+
+            Str("Intel's numbered ladder picks the lowest",
+                RoamingLock.CalmestValue(Prop("Roaming Aggressiveness", "RoamAggressiveness",
+                    "1. Lowest", "2. Medium-Low", "3. Medium", "4. Medium-High", "5. Highest")),
+                "1. Lowest");
+
+            Str("a plain toggle picks Disabled",
+                RoamingLock.CalmestValue(Prop("Roaming", "Roam", "Enabled", "Disabled")),
+                "Disabled");
+
+            Str("worded scales pick Low",
+                RoamingLock.CalmestValue(Prop("Roam Tendency", "RoamTendency", "Low", "Medium", "High")),
+                "Low");
+
+            // The trap: a substring test for "low" matches "Allow", which would
+            // select the most aggressive option instead of the calmest. Refusing
+            // is an acceptable outcome here; picking "Allow roaming" is not.
+            string decision = RoamingLock.CalmestValue(Prop("Roaming Decision", "RoamDecision",
+                "Allow roaming", "Block roaming"));
+            Bool("\"Allow roaming\" is never chosen for the hint \"low\"",
+                decision != "Allow roaming", true);
+
+            // Refusing beats guessing: picking blind could select the most
+            // aggressive setting and make the problem worse.
+            Bool("unrecognisable value sets are refused",
+                RoamingLock.CalmestValue(Prop("Roaming Mode", "RoamMode", "Alpha", "Beta")) == null,
+                true);
+            Bool("an empty value set is refused",
+                RoamingLock.CalmestValue(Prop("Roaming Mode", "RoamMode")) == null, true);
+
+            Section("Roaming lockdown - discovery");
+            var props = new List<AdvancedProperty>
+            {
+                Prop("Roaming Aggressiveness", "RoamAggressiveness", "1. Lowest", "3. Medium"),
+                Prop("Preferred Band", "RoamingPreferredBandType", "No Preference", "Prefer 5GHz"),
+                Prop("Transmit Power", "TxPower", "1. Lowest", "5. Highest")
+            };
+            List<RoamingLock.Candidate> found = RoamingLock.Find(props);
+
+            // Transmit Power also has a "1. Lowest", so a value-shaped match would
+            // wrongly cripple the radio. And Preferred Band is keyed
+            // "RoamingPreferredBandType", so a name-only match would force a band
+            // preference that contradicts whatever the user just pinned.
+            Eq("only genuine roaming controls match", found.Count, 1);
+            Bool("transmit power is not touched",
+                found.TrueForAll(c => c.Property.DisplayName != "Transmit Power"), true);
+            Bool("band preference is not touched",
+                found.TrueForAll(c => c.Property.DisplayName != "Preferred Band"), true);
+            Str("the aggressiveness target is the lowest rung",
+                found[0].TargetValue, "1. Lowest");
+
+            Prop("Roaming Aggressiveness", "RoamAggressiveness", "1. Lowest");
+            var already = RoamingLock.Find(new List<AdvancedProperty> { Current("Roaming Aggressiveness",
+                "RoamAggressiveness", "1. Lowest", "1. Lowest", "3. Medium") });
+            Bool("a setting already at its calmest is reported as such",
+                already.Count == 1 && already[0].AlreadySet, true);
+        }
+
+        private static AdvancedProperty Prop(string name, string keyword, params string[] values)
+        {
+            return new AdvancedProperty
+            {
+                DisplayName = name,
+                RegistryKeyword = keyword,
+                DisplayValue = values.Length > 0 ? values[0] : null,
+                ValidValues = new List<string>(values)
+            };
+        }
+
+        private static AdvancedProperty Current(string name, string keyword, string current,
+                                                params string[] values)
+        {
+            AdvancedProperty p = Prop(name, keyword, values);
+            p.DisplayValue = current;
+            return p;
+        }
+
+        private static void SignalHistoryRules()
+        {
+            Section("Signal history");
+
+            var history = new SignalHistory();
+            var ap = new AccessPoint { Bssid = "AA:BB:CC:DD:EE:FF", RssiDbm = -60 };
+
+            Eq("an unseen radio has no samples", history.For("00:00:00:00:00:00").Count, 0);
+            Eq("and no spread", history.SpreadFor("00:00:00:00:00:00"), 0);
+
+            for (int i = 0; i < 5; i++)
+            {
+                ap.RssiDbm = -60 - i;
+                history.Record(new List<AccessPoint> { ap });
+            }
+            Eq("samples accumulate", history.For(ap.Bssid).Count, 5);
+            Eq("spread is max minus min", history.SpreadFor(ap.Bssid), 4);
+
+            // The buffer has to stay bounded: this records forever while the app
+            // is open, and an unbounded list would grow without limit.
+            for (int i = 0; i < SignalHistory.Capacity * 2; i++)
+            {
+                ap.RssiDbm = -55;
+                history.Record(new List<AccessPoint> { ap });
+            }
+            Eq("the ring buffer is capped", history.For(ap.Bssid).Count, SignalHistory.Capacity);
+            Eq("old samples are evicted, not kept", history.SpreadFor(ap.Bssid), 0);
+
+            Eq("lookup is case-insensitive", history.For("aa:bb:cc:dd:ee:ff").Count, SignalHistory.Capacity);
         }
 
         private static void Bool(string what, bool actual, bool expected)

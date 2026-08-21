@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using BandPilot.Adapter;
 using BandPilot.Wifi;
 
 namespace BandPilot.Ui
@@ -20,6 +21,7 @@ namespace BandPilot.Ui
         private List<WifiAdapter> _adapters = new List<WifiAdapter>();
         private List<AccessPoint> _scan = new List<AccessPoint>();
         private CurrentConnection _current;
+        private readonly SignalHistory _history = new SignalHistory();
         private bool _busy;
         private bool _loading;
 
@@ -41,11 +43,22 @@ namespace BandPilot.Ui
             _tick.Tick += (s, e) => RefreshCurrentOnly();
 
             Loaded += OnFirstLoad;
+
+            // Row colours come from CLR properties on ApRow, which WPF reads
+            // once at bind time. Without a rebuild the band pills and rating
+            // bars keep the previous palette's brushes after a theme swap.
+            ThemeManager.Changed += OnThemeChanged;
+        }
+
+        private void OnThemeChanged(object sender, EventArgs e)
+        {
+            if (_started) Rebuild();
         }
 
         public void Shutdown()
         {
             if (_tick != null) _tick.Stop();
+            ThemeManager.Changed -= OnThemeChanged;
         }
 
         private bool _started;
@@ -174,6 +187,7 @@ namespace BandPilot.Ui
 
                 _current = result.Item1;
                 _scan = result.Item2;
+                _history.Record(_scan);
 
                 if (a.Capability != null) a.Capability.LearnFrom(_scan);
                 ApplyCapability();
@@ -201,6 +215,11 @@ namespace BandPilot.Ui
             UpdateConnectEnabled();
         }
 
+        /// <summary>
+        /// Runs on the page timer. Reads the driver's cached BSS list, which is
+        /// cheap and does not trigger a scan, so the trend line keeps filling in
+        /// without disturbing the connection.
+        /// </summary>
         private void RefreshCurrentOnly()
         {
             WifiAdapter a = SelectedAdapter;
@@ -208,15 +227,16 @@ namespace BandPilot.Ui
 
             try
             {
-                CurrentConnection cur = _wifi.GetCurrentConnection(a.Guid);
-                bool changed = (cur == null) != (_current == null)
-                    || (cur != null && _current != null && cur.Bssid != _current.Bssid);
-                _current = cur;
-
-                // Only the cheap parts unless the radio actually moved.
-                if (changed) Rebuild(); else UpdateBanner();
+                _current = _wifi.GetCurrentConnection(a.Guid);
+                _scan = _wifi.GetAccessPoints(a.Guid, _current);
+                _history.Record(_scan);
+                Rebuild();
             }
-            catch (Exception) { }
+            catch (Exception)
+            {
+                // A failed background refresh should never interrupt the page;
+                // the next tick will try again.
+            }
         }
 
         // ------------------------------------------------------------------
@@ -225,6 +245,12 @@ namespace BandPilot.Ui
 
         private void Rebuild()
         {
+            // The list is rebuilt on every tick now that it carries a trend
+            // line, so losing the selection each time would make the connect
+            // button impossible to aim.
+            ApRow previous = ApList.SelectedItem as ApRow;
+            string keepBssid = previous != null ? previous.Bssid : null;
+
             UpdateBanner();
 
             WifiAdapter a = SelectedAdapter;
@@ -291,12 +317,26 @@ namespace BandPilot.Ui
                         Ap = ap,
                         Current = ap.IsCurrent,
                         IsBest = best != null && ReferenceEquals(ap, best) && !ap.IsCurrent,
-                        Unusable = unusable
+                        Unusable = unusable,
+                        History = _history.For(ap.Bssid),
+                        Spread = _history.SpreadFor(ap.Bssid)
                     });
                 }
             }
 
             ApList.ItemsSource = rows;
+            if (keepBssid != null)
+            {
+                foreach (ApRow candidate in rows.OfType<ApRow>())
+                {
+                    if (string.Equals(candidate.Bssid, keepBssid, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ApList.SelectedItem = candidate;
+                        break;
+                    }
+                }
+            }
+
             UpdateVerdict(groups.FirstOrDefault(g => g.Connected)?.Items, six, sixUnknown);
             UpdateConnectEnabled();
         }
@@ -564,6 +604,121 @@ namespace BandPilot.Ui
             {
                 _busy = false;
                 UpdateConnectEnabled();
+            }
+        }
+
+        /// <summary>
+        /// Pinning a BSSID only holds until the driver decides to roam, so this
+        /// is the other half of the feature: find whatever this particular
+        /// driver calls its roaming control and turn it down.
+        /// </summary>
+        private async void OnHoldRadio(object sender, RoutedEventArgs e)
+        {
+            WifiAdapter a = SelectedAdapter;
+            if (a == null || _busy) return;
+
+            BtnHold.IsEnabled = false;
+            Status("Looking for this driver's roaming setting…", "B.TextDim");
+
+            try
+            {
+                Guid guid = a.Guid;
+                string desc = a.Description;
+
+                var found = await Task.Run(() =>
+                {
+                    string key = AdapterRegistry.FindInstanceKey(guid, desc);
+                    if (key == null) return null;
+                    return RoamingLock.Find(AdapterRegistry.Read(key));
+                });
+
+                if (found == null)
+                {
+                    Status("Could not find this radio's driver key in the registry.", "B.WarnText");
+                    return;
+                }
+
+                if (found.Count == 0)
+                {
+                    _shell.ShowNotice("No roaming control on this driver",
+                        "This driver does not expose a roaming setting BandPilot can recognise, "
+                        + "so there is nothing to hold down. Your pinned radio will still last "
+                        + "for the current connection — it just cannot be made to stick across "
+                        + "a roam.\n\nThe Adapter page lists everything this driver does expose.");
+                    Status(string.Empty, "B.TextDim");
+                    return;
+                }
+
+                var pending = found.FindAll(c => !c.AlreadySet);
+                if (pending.Count == 0)
+                {
+                    Status("Roaming is already turned down as far as this driver allows.", "B.Good");
+                    return;
+                }
+
+                string list = string.Join("\n", pending.ConvertAll(c => "    " + c.Describe()));
+                _shell.ShowConfirm(
+                    "Hold this radio",
+                    "Turn down this driver's roaming so Windows stops drifting off the access "
+                    + "point you chose:\n\n" + list
+                    + "\n\nThe Wi-Fi connection will drop briefly while the radio restarts. "
+                    + "You can undo it any time from the Adapter page.",
+                    "Hold the radio",
+                    () => ApplyHold(pending));
+            }
+            catch (Exception ex)
+            {
+                Status(ex.Message, "B.Bad");
+            }
+            finally
+            {
+                BtnHold.IsEnabled = true;
+            }
+        }
+
+        private async void ApplyHold(System.Collections.Generic.List<RoamingLock.Candidate> pending)
+        {
+            WifiAdapter a = SelectedAdapter;
+            if (a == null) return;
+
+            BtnHold.IsEnabled = false;
+            Status("Holding the radio…", "B.Accent");
+
+            try
+            {
+                Guid guid = a.Guid;
+                string desc = a.Description;
+
+                int applied = await Task.Run(() =>
+                {
+                    string name = AdapterProperties.ResolveAdapterName(guid, desc);
+                    if (name == null)
+                    {
+                        throw new InvalidOperationException(
+                            "Could not match this radio to a Windows network adapter.");
+                    }
+
+                    int count = 0;
+                    foreach (RoamingLock.Candidate c in pending)
+                    {
+                        AdapterProperties.SetAdvanced(name, c.Property.RegistryKeyword, c.TargetValue);
+                        count++;
+                    }
+                    return count;
+                });
+
+                Status(applied == 1
+                    ? "Roaming turned down. Your chosen radio should now stick."
+                    : applied + " roaming settings turned down. Your chosen radio should now stick.",
+                    "B.Good");
+            }
+            catch (Exception ex)
+            {
+                Status(ex.Message, "B.Bad");
+            }
+            finally
+            {
+                BtnHold.IsEnabled = true;
             }
         }
 

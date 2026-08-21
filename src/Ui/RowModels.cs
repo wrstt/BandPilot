@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
 using BandPilot.Wifi;
@@ -122,6 +123,72 @@ namespace BandPilot.Ui
                     case WifiBand.Band5: return Res("B.Band5Bg");
                     default: return Res("B.Band24Bg");
                 }
+            }
+        }
+
+        /// <summary>Recent RSSI readings for this radio, oldest first.</summary>
+        public IList<int> History { get; set; }
+
+        /// <summary>Spread in dB across the samples held.</summary>
+        public int Spread { get; set; }
+
+        public const double SparkWidth = 58;
+        public const double SparkHeight = 16;
+
+        /// <summary>
+        /// The history plotted into a fixed box. Scaled against a fixed -90..-40
+        /// dBm window rather than the series' own min and max: auto-scaling makes
+        /// a rock-steady radio look wildly erratic, because a 1 dB wobble would
+        /// fill the whole height.
+        /// </summary>
+        public PointCollection SparklinePoints
+        {
+            get
+            {
+                var points = new PointCollection();
+                if (History == null || History.Count < 2) return points;
+
+                int n = History.Count;
+                double stepX = SparkWidth / (n - 1);
+
+                for (int i = 0; i < n; i++)
+                {
+                    double normalised = (History[i] + 90) / 50.0;
+                    if (normalised < 0) normalised = 0;
+                    if (normalised > 1) normalised = 1;
+
+                    points.Add(new Point(i * stepX, SparkHeight - (normalised * SparkHeight)));
+                }
+                return points;
+            }
+        }
+
+        public Visibility SparklineVisibility
+        {
+            get
+            {
+                return History != null && History.Count >= 2
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Flags a radio whose signal swings more than 8 dB. That is roughly the
+        /// point where a reading stops predicting the next one.
+        /// </summary>
+        public Brush SparklineBrush
+        {
+            get { return Spread >= 8 ? Res("B.WarnRail") : RatingBrush; }
+        }
+
+        public string SparklineTooltip
+        {
+            get
+            {
+                if (History == null || History.Count < 2) return "Not enough samples yet";
+                return History.Count + " samples · " + Spread + " dB spread"
+                     + (Spread >= 8 ? " — unstable" : " — steady");
             }
         }
 

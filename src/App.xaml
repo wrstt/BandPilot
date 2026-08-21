@@ -5,6 +5,10 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
+        <!-- Index 0 is the palette and ThemeManager swaps it in place, so the
+             ordering here is load-bearing: styles must come after the colours
+             they refer to. -->
+        <ResourceDictionary Source="Ui/Palette.Light.xaml"/>
         <ResourceDictionary Source="Ui/Theme.xaml"/>
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>

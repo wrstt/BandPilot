@@ -15,6 +15,10 @@ namespace BandPilot
             // event handlers talking to drivers that can fail in novel ways.
             DispatcherUnhandledException += OnDispatcherException;
 
+            // Before any window exists, so the first paint is already correct
+            // rather than flashing light and then switching.
+            ThemeManager.Initialise();
+
             WifiService wifi;
             try
             {

@@ -5,7 +5,7 @@
         Title="BandPilot"
         Width="1100" Height="700" MinWidth="960" MinHeight="620"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource B.Background}"
+        Background="{DynamicResource B.Background}"
         TextOptions.TextFormattingMode="Ideal"
         UseLayoutRounding="True"
         FontFamily="{StaticResource F.Sans}">
@@ -25,13 +25,13 @@
       </Grid.RowDefinitions>
 
       <!-- ============================ title bar ============================ -->
-      <Border Grid.Row="0" Background="{StaticResource B.Surface}"
-              BorderBrush="{StaticResource B.Hairline}" BorderThickness="0,0,0,1">
+      <Border Grid.Row="0" Background="{DynamicResource B.Surface}"
+              BorderBrush="{DynamicResource B.Hairline}" BorderThickness="0,0,0,1">
         <Grid>
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
-            <Ellipse Width="7" Height="7" Fill="{StaticResource B.Accent2}" VerticalAlignment="Center"/>
+            <Ellipse Width="7" Height="7" Fill="{DynamicResource B.Accent2}" VerticalAlignment="Center"/>
             <TextBlock Text="BandPilot" Margin="9,0,0,0" FontSize="12"
-                       Foreground="{StaticResource B.TextSecondary}" VerticalAlignment="Center"/>
+                       Foreground="{DynamicResource B.TextSecondary}" VerticalAlignment="Center"/>
           </StackPanel>
 
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
@@ -51,8 +51,8 @@
         </Grid.ColumnDefinitions>
 
         <!-- sidebar -->
-        <Border Grid.Column="0" Background="{StaticResource B.Surface}"
-                BorderBrush="{StaticResource B.Hairline}" BorderThickness="0,0,1,0">
+        <Border Grid.Column="0" Background="{DynamicResource B.Surface}"
+                BorderBrush="{DynamicResource B.Hairline}" BorderThickness="0,0,1,0">
           <Grid>
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto"/>
@@ -62,11 +62,11 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Margin="18,18,14,0">
-              <TextBlock FontSize="16" FontWeight="Bold" Foreground="{StaticResource B.Heading}">
-                <Run Text="Band"/><Run Text="Pilot" Foreground="{StaticResource B.Accent}"/>
+              <TextBlock FontSize="16" FontWeight="Bold" Foreground="{DynamicResource B.Heading}">
+                <Run Text="Band"/><Run Text="Pilot" Foreground="{DynamicResource B.Accent}"/>
               </TextBlock>
               <TextBlock Text="Band control for any Wi-Fi card" FontSize="10"
-                         Foreground="{StaticResource B.TextFaint}" TextWrapping="Wrap"
+                         Foreground="{DynamicResource B.TextFaint}" TextWrapping="Wrap"
                          Margin="0,4,0,0" LineHeight="14"/>
             </StackPanel>
 
@@ -85,14 +85,23 @@
             </StackPanel>
 
             <StackPanel Grid.Row="3" Margin="0,0,0,12">
-              <Border Height="1" Background="{StaticResource B.Hairline}" Margin="18,0,18,10"/>
+              <Border Height="1" Background="{DynamicResource B.Hairline}" Margin="18,0,18,10"/>
+              <Button x:Name="BtnTheme" Style="{StaticResource Btn.Ghost}" HorizontalAlignment="Left"
+                      Margin="12,0,12,4" Padding="6,5" Click="OnThemeClick">
+                <StackPanel Orientation="Horizontal">
+                  <Path x:Name="ThemeIcon" Style="{StaticResource Icon}" Width="14" Height="14"
+                        Data="{StaticResource I.Moon}"/>
+                  <TextBlock x:Name="ThemeLabel" Margin="9,0,0,0" FontSize="11.5"
+                             Foreground="{DynamicResource B.TextSecondary}" VerticalAlignment="Center"/>
+                </StackPanel>
+              </Button>
               <Button x:Name="BtnQos" Style="{StaticResource Btn.Ghost}" HorizontalAlignment="Left"
                       Margin="12,0,12,0" Padding="6,5" Click="OnQosClick">
                 <StackPanel Orientation="Horizontal">
-                  <Ellipse x:Name="QosDot" Width="7" Height="7" Fill="{StaticResource B.TextFaint}"
+                  <Ellipse x:Name="QosDot" Width="7" Height="7" Fill="{DynamicResource B.TextFaint}"
                            VerticalAlignment="Center"/>
                   <TextBlock x:Name="QosLabel" Text="Enable QoS marking" Margin="9,0,0,0" FontSize="11.5"
-                             Foreground="{StaticResource B.TextSecondary}" TextWrapping="Wrap"
+                             Foreground="{DynamicResource B.TextSecondary}" TextWrapping="Wrap"
                              MaxWidth="118" TextAlignment="Left"/>
                 </StackPanel>
               </Button>
@@ -108,25 +117,25 @@
     <!-- ============================== modal ============================== -->
     <!-- One overlay for the whole window; pages call ShowDialog on the shell
          rather than each owning its own popup plumbing. -->
-    <Grid x:Name="ModalLayer" Visibility="Collapsed" Background="{StaticResource B.Overlay}">
+    <Grid x:Name="ModalLayer" Visibility="Collapsed" Background="{DynamicResource B.Overlay}">
       <Border Style="{StaticResource Card}" CornerRadius="12" Width="440"
               HorizontalAlignment="Center" VerticalAlignment="Center" Padding="20">
         <StackPanel>
           <TextBlock x:Name="ModalTitle" FontSize="14.5" FontWeight="SemiBold"
-                     Foreground="{StaticResource B.Heading}" TextWrapping="Wrap"/>
+                     Foreground="{DynamicResource B.Heading}" TextWrapping="Wrap"/>
           <TextBlock x:Name="ModalBody" Margin="0,9,0,0" FontSize="12.5" LineHeight="18"
-                     Foreground="{StaticResource B.TextSecondary}" TextWrapping="Wrap"/>
+                     Foreground="{DynamicResource B.TextSecondary}" TextWrapping="Wrap"/>
 
           <Border x:Name="ModalCodeWrap" Visibility="Collapsed" Margin="0,12,0,0"
-                  Background="{StaticResource B.Background}" CornerRadius="8" Padding="11,9">
+                  Background="{DynamicResource B.Background}" CornerRadius="8" Padding="11,9">
             <TextBox x:Name="ModalCode" IsReadOnly="True" BorderThickness="0" Background="Transparent"
                      FontFamily="{StaticResource F.Mono}" FontSize="11"
-                     Foreground="{StaticResource B.TextSecondary}"
+                     Foreground="{DynamicResource B.TextSecondary}"
                      TextWrapping="Wrap" AcceptsReturn="True"/>
           </Border>
 
           <TextBlock x:Name="ModalNote" Visibility="Collapsed" Margin="0,11,0,0" FontSize="11.5"
-                     Foreground="{StaticResource B.WarnText}" TextWrapping="Wrap"/>
+                     Foreground="{DynamicResource B.WarnText}" TextWrapping="Wrap"/>
 
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
             <Button x:Name="ModalCancel" Style="{StaticResource Btn.Secondary}" Content="Cancel"
