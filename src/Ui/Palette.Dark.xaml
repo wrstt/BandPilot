@@ -1,7 +1,12 @@
 <!--
-    Dark "midnight" palette, taken from the design tool's own dark exploration
-    rather than invented by dimming the light one — desaturating a light theme
-    reliably produces mud.
+    Dark "graphite" palette.
+
+    Rebuilt for contrast rather than atmosphere. The first attempt was a navy
+    midnight scheme that looked good in isolation and read poorly in use: not
+    enough separation between the ground, the cards and the text on them.
+    Everything here is pushed further apart — a near-black ground, a clearly
+    lifted surface, and brighter accents, since a colour that reads well on
+    white is usually too dark to read on black.
 
     Same key set as Palette.Light.xaml, and the same rule holds: bands are
     purple / blue / slate while status is green / amber / red, so a band colour
@@ -11,27 +16,27 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-  <Color x:Key="C.Background">#16161F</Color>
-  <Color x:Key="C.Surface">#1E1E30</Color>
-  <Color x:Key="C.Text">#EEF1F8</Color>
-  <Color x:Key="C.Heading">#F5F8FF</Color>
-  <Color x:Key="C.TextSecondary">#C6CBD9</Color>
-  <Color x:Key="C.TextDim">#8B93A7</Color>
-  <Color x:Key="C.TextFaint">#6A7A99</Color>
-  <Color x:Key="C.Accent">#22D3EE</Color>
-  <Color x:Key="C.Accent2">#06B6D4</Color>
-  <Color x:Key="C.Good">#34D399</Color>
+  <Color x:Key="C.Background">#0E1116</Color>
+  <Color x:Key="C.Surface">#161A21</Color>
+  <Color x:Key="C.Text">#E6EAF0</Color>
+  <Color x:Key="C.Heading">#F7F9FC</Color>
+  <Color x:Key="C.TextSecondary">#B6BFCC</Color>
+  <Color x:Key="C.TextDim">#8B95A5</Color>
+  <Color x:Key="C.TextFaint">#6D7787</Color>
+  <Color x:Key="C.Accent">#38BDF8</Color>
+  <Color x:Key="C.Accent2">#2DD4BF</Color>
+  <Color x:Key="C.Good">#4ADE80</Color>
   <Color x:Key="C.WarnText">#FBBF24</Color>
-  <Color x:Key="C.WarnRail">#FCD34D</Color>
-  <Color x:Key="C.Bad">#F26D6D</Color>
-  <Color x:Key="C.Band6">#A78BFA</Color>
+  <Color x:Key="C.WarnRail">#F59E0B</Color>
+  <Color x:Key="C.Bad">#F87171</Color>
+  <Color x:Key="C.Band6">#C084FC</Color>
   <Color x:Key="C.Band5">#60A5FA</Color>
   <Color x:Key="C.Band24">#94A3B8</Color>
   <Color x:Key="C.CloseHover">#E5484D</Color>
 
   <!-- Hairlines and row washes key off a light colour here, because tinting
        with the dark text colour would be invisible against a dark surface. -->
-  <Color x:Key="C.Line">#8FA3C8</Color>
+  <Color x:Key="C.Line">#9FB0C8</Color>
 
   <SolidColorBrush x:Key="B.Background" Color="{StaticResource C.Background}"/>
   <SolidColorBrush x:Key="B.Surface" Color="{StaticResource C.Surface}"/>

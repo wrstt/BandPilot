@@ -72,26 +72,13 @@ namespace BandPilot.Ui
             }
             catch (Exception) { /* fall through to the system preference */ }
 
-            return FollowsSystemDark() ? AppTheme.Dark : AppTheme.Light;
-        }
-
-        /// <summary>
-        /// With no saved choice, match what the user already told Windows they
-        /// want rather than assuming light.
-        /// </summary>
-        private static bool FollowsSystemDark()
-        {
-            try
-            {
-                using (RegistryKey k = Registry.CurrentUser.OpenSubKey(
-                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))
-                {
-                    if (k == null) return false;
-                    object v = k.GetValue("AppsUseLightTheme");
-                    return v is int && (int)v == 0;
-                }
-            }
-            catch (Exception) { return false; }
+            // Light unless the user has explicitly asked for dark.
+            //
+            // This deliberately does NOT follow the Windows system theme. Doing
+            // so meant anyone running Windows in dark mode met a dark BandPilot
+            // on first launch without choosing it, and the dark theme is the
+            // less-tested of the two. An opt-in is the honest default.
+            return AppTheme.Light;
         }
 
         private static void Save(AppTheme theme)

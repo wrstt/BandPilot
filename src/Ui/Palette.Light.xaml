@@ -12,12 +12,12 @@
   <Color x:Key="C.Heading">#14484F</Color>
   <Color x:Key="C.TextSecondary">#42605F</Color>
   <Color x:Key="C.TextDim">#5F7A7D</Color>
-  <Color x:Key="C.TextFaint">#7A938F</Color>
+  <Color x:Key="C.TextFaint">#6E8783</Color>
   <Color x:Key="C.Accent">#0E7490</Color>
   <Color x:Key="C.Accent2">#0D9488</Color>
   <Color x:Key="C.Good">#15803D</Color>
   <Color x:Key="C.WarnText">#B45309</Color>
-  <Color x:Key="C.WarnRail">#CA8A04</Color>
+  <Color x:Key="C.WarnRail">#B57C04</Color>
   <Color x:Key="C.Bad">#B91C1C</Color>
   <Color x:Key="C.Band6">#0F766E</Color>
   <Color x:Key="C.Band5">#0E7490</Color>

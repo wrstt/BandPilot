@@ -28,6 +28,11 @@ jobs:
       - name: Verify WPF resource keys resolve
         run: python3 tools/check-resources.py
 
+      # The first dark theme shipped with unreadable text and nothing in the
+      # build could see it. Contrast is arithmetic, so it does not need eyes.
+      - name: Verify text contrast in both themes
+        run: python3 tools/check-contrast.py
+
   build:
     needs: verify
     runs-on: windows-latest
