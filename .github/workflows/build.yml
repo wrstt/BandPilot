@@ -22,6 +22,12 @@ jobs:
       - name: Run layout and math checks
         run: dotnet run -c Release --project tests/LayoutTests/LayoutTests.csproj
 
+      # WPF resolves StaticResource at runtime, so a mistyped key builds fine
+      # and throws on first show. The compiler cannot catch it and neither can
+      # the Windows build job, so it is checked statically here.
+      - name: Verify WPF resource keys resolve
+        run: python3 tools/check-resources.py
+
   build:
     needs: verify
     runs-on: windows-latest
