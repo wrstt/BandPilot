@@ -16,6 +16,7 @@
     <Compile Include="../../src/Native/WlanApi.cs" />
     <Compile Include="../../src/Wifi/BandTools.cs" />
     <Compile Include="../../src/Wifi/AccessPoint.cs" />
+    <Compile Include="../../src/Wifi/AdapterCapability.cs" />
   </ItemGroup>
 
 </Project>

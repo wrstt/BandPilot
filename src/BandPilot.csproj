@@ -3,7 +3,11 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <!-- WPF rather than WinForms: the interface uses rounded cards, drop
+         shadows, an in-app modal layer and small transitions, all of which are
+         native here and all of which would be owner-draw work in WinForms.
+         Nothing outside src/Ui changed in the move. -->
+    <UseWPF>true</UseWPF>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>BandPilot</AssemblyName>
@@ -12,17 +16,18 @@
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>BandPilot</Product>
-    <Description>Wi-Fi band and access-point control for Intel BE2xx series adapters</Description>
+    <Description>Wi-Fi band and access-point control for Intel AX/BE and other modern Wi-Fi adapters</Description>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ApplicationIcon></ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Per-process bandwidth accounting via ETW. Optional at runtime: if this
-         assembly fails to load the Monitor tab degrades to a message instead of
-         taking the whole app down. -->
+         assembly fails to load the Live traffic page degrades to a message
+         instead of taking the whole app down. -->
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.16" />
   </ItemGroup>
 

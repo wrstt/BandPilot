@@ -43,18 +43,34 @@ namespace BandPilot.Wifi
         }
 
         /// <summary>
-        /// True for the Wi-Fi 7 parts this tool was written for. Used only to
-        /// preselect the right adapter when a machine has more than one radio.
+        /// What the driver says this card can do. Populated by WifiService when
+        /// the adapter list is built, so nothing downstream has to guess from
+        /// the model name.
         /// </summary>
-        public bool LooksLikeBe2xx
+        public AdapterCapability Capability { get; set; }
+
+        public bool IsConnected { get { return State == WlanInterfaceState.Connected; } }
+
+        /// <summary>
+        /// Preselection rank when a machine has more than one radio. An earlier
+        /// version matched Intel BE2xx model strings, which picked the wrong
+        /// adapter on every card that was not on the list. Ranking on what the
+        /// driver reports keeps a USB Wi-Fi 5 dongle from winning over the
+        /// built-in Wi-Fi 6E card without naming either of them.
+        /// </summary>
+        public int PreferenceRank
         {
             get
             {
-                if (string.IsNullOrEmpty(Description)) return false;
-                string d = Description.ToUpperInvariant();
-                return d.Contains("BE200") || d.Contains("BE201") || d.Contains("BE202")
-                    || d.Contains("BE1750") || d.Contains("WI-FI 7") || d.Contains("WIFI 7")
-                    || d.Contains("BE21") || d.Contains("BE22");
+                int rank = 0;
+                if (IsConnected) rank += 1000;
+                if (Capability != null)
+                {
+                    rank += (int)Capability.MaxPhy * 10;
+                    if (Capability.Supports6Ghz) rank += 50;
+                    if (Capability.CanPinBssid) rank += 25;
+                }
+                return rank;
             }
         }
     }

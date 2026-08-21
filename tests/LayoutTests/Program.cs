@@ -33,6 +33,7 @@ namespace BandPilot.Tests
             ChannelMath();
             BandMath();
             ScoreSanity();
+            CapabilityRules();
 
             Console.WriteLine();
             Console.WriteLine(_failures == 0
@@ -43,6 +44,94 @@ namespace BandPilot.Tests
         }
 
         // ---- assertions -----------------------------------------------------
+
+        /// <summary>
+        /// The capability layer decides whether a 6 GHz row is offered or greyed
+        /// out, and whether the connect button works at all. Getting it wrong
+        /// silently removes the app's main feature on hardware that supports it,
+        /// so the fail-open choices are pinned here.
+        /// </summary>
+        private static void CapabilityRules()
+        {
+            Section("Adapter capability");
+
+            AdapterCapability wifi7 = new AdapterCapability
+            { MaxPhy = Dot11PhyType.Eht, MaxBssidListSize = 1 };
+            Bool("Wi-Fi 7 counts as 6 GHz capable", wifi7.Supports6Ghz, true);
+            Str("Wi-Fi 7 chip text", wifi7.CapabilityLabel, "Wi-Fi 7 · 6 GHz ready");
+
+            AdapterCapability wifi6 = new AdapterCapability
+            { MaxPhy = Dot11PhyType.He, MaxBssidListSize = 1 };
+            Bool("Wi-Fi 6 without evidence is not claimed capable", wifi6.Supports6Ghz, false);
+            Bool("...but is reported unknown, not incapable", wifi6.SixGhzUnknown, true);
+            Str("Wi-Fi 6 chip text", wifi6.CapabilityLabel, "Wi-Fi 6 · no 6 GHz seen");
+
+            // A 6E card proves itself the moment it reports a 6 GHz BSS, since
+            // scan results can only come from a radio that can tune there.
+            wifi6.LearnFrom(new List<AccessPoint>
+            {
+                new AccessPoint { Band = WifiBand.Band24 },
+                new AccessPoint { Band = WifiBand.Band6 }
+            });
+            Bool("seeing a 6 GHz BSS proves capability", wifi6.Supports6Ghz, true);
+            Bool("and clears the unknown state", wifi6.SixGhzUnknown, false);
+
+            AdapterCapability wifi5 = new AdapterCapability
+            { MaxPhy = Dot11PhyType.Vht, MaxBssidListSize = 1 };
+            Bool("Wi-Fi 5 is not flagged unknown, it simply has no 6 GHz", wifi5.SixGhzUnknown, false);
+            Str("Wi-Fi 5 chip text", wifi5.CapabilityLabel, "Wi-Fi 5");
+
+            AdapterCapability noPin = new AdapterCapability
+            { MaxPhy = Dot11PhyType.He, MaxBssidListSize = 0 };
+            Bool("a driver reporting 0 BSSIDs cannot pin", noPin.CanPinBssid, false);
+            Bool("and explains why", noPin.PinWarning != null, true);
+
+            // A failed capability query must not disable pinning on a card that
+            // supports it, so the unknown case deliberately fails open.
+            Bool("unknown capability still allows pinning", AdapterCapability.Unknown().CanPinBssid, true);
+
+            Section("Highest PHY selection");
+            WlanInterfaceCapability native = new WlanInterfaceCapability();
+            native.dwMaxDesiredBssidListSize = 4;
+            native.dwNumberOfSupportedPhys = 5;
+            native.dot11PhyTypes = new Dot11PhyType[64];
+            native.dot11PhyTypes[0] = Dot11PhyType.Erp;
+            native.dot11PhyTypes[1] = Dot11PhyType.Ht;
+            native.dot11PhyTypes[2] = Dot11PhyType.Vht;
+            native.dot11PhyTypes[3] = Dot11PhyType.He;
+            native.dot11PhyTypes[4] = Dot11PhyType.Dmg;   // 60 GHz, not on the ladder
+            AdapterCapability built = AdapterCapability.FromNative(native);
+            Eq("picks HE over DMG and older PHYs", (int)built.MaxPhy, (int)Dot11PhyType.He);
+            Eq("carries the BSSID list size through", built.MaxBssidListSize, 4);
+
+            // Entries past dwNumberOfSupportedPhys are uninitialised padding and
+            // must not be read, or an empty slot could outrank a real one.
+            WlanInterfaceCapability shortList = new WlanInterfaceCapability();
+            shortList.dwNumberOfSupportedPhys = 1;
+            shortList.dot11PhyTypes = new Dot11PhyType[64];
+            shortList.dot11PhyTypes[0] = Dot11PhyType.Ht;
+            shortList.dot11PhyTypes[5] = Dot11PhyType.Eht;   // beyond the count
+            Eq("ignores entries past the reported count",
+                (int)AdapterCapability.FromNative(shortList).MaxPhy, (int)Dot11PhyType.Ht);
+        }
+
+        private static void Bool(string what, bool actual, bool expected)
+        {
+            _checks++;
+            bool ok = actual == expected;
+            if (!ok) _failures++;
+            Console.WriteLine("  [{0}] {1,-52} {2,6}  (expected {3})",
+                ok ? "ok" : "FAIL", what, actual, expected);
+        }
+
+        private static void Str(string what, string actual, string expected)
+        {
+            _checks++;
+            bool ok = actual == expected;
+            if (!ok) _failures++;
+            Console.WriteLine("  [{0}] {1,-52} {2}", ok ? "ok" : "FAIL", what,
+                ok ? actual : actual + "  (expected " + expected + ")");
+        }
 
         private static void Eq(string what, long actual, long expected)
         {
@@ -74,6 +163,8 @@ namespace BandPilot.Tests
             Eq("WLAN_CONNECTION_PARAMETERS", Marshal.SizeOf<WlanConnectionParameters>(), 40);
             Eq("WLAN_INTERFACE_INFO", Marshal.SizeOf<WlanInterfaceInfo>(), 532);
             Eq("WLAN_PROFILE_INFO", Marshal.SizeOf<WlanProfileInfo>(), 516);
+            // 4 + 4 + 4 + 4 + 4 + (64 * 4) = 276
+            Eq("WLAN_INTERFACE_CAPABILITY", Marshal.SizeOf<WlanInterfaceCapability>(), 276);
         }
 
         private static void FieldOffsets()

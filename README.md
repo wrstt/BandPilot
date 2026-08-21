@@ -1,12 +1,12 @@
 # BandPilot
 
-**Choose which Wi-Fi band and which access point you connect to — on Intel BE200 / BE201 / BE202 (Wi-Fi 7) adapters.**
+**Choose which Wi-Fi band and which access point you connect to.**
 
 Windows hides the single most useful Wi-Fi decision from you. On a hotel, campus, office or apartment network, one name like `Red Roof Inn` is not one radio — it is a 2.4 GHz radio, a 5 GHz radio and often a 6 GHz radio, on *every* access point in the building. Windows silently picks one, frequently a congested 2.4 GHz radio two floors away, and offers no way to see which one you got or to change it.
 
 BandPilot shows you every radio separately and connects you to the one you pick.
 
-<!-- Screenshot placeholder: add a capture of the Bands page here. -->
+![BandPilot](docs/screenshot.png)
 
 ---
 
@@ -18,18 +18,33 @@ BandPilot is an independent, open-source reimplementation of the parts that matt
 
 ---
 
+## Works with any card
+
+Nothing in BandPilot is written for one vendor. It asks the driver what the card can do and adapts:
+
+- **Wi-Fi generation** and **6 GHz support**, from `WlanGetInterfaceCapability`
+- **Whether the driver will accept a preferred access point at all** — `dwMaxDesiredBssidListSize`. A driver reporting `0` cannot be pinned to a specific radio no matter what the UI offers, so BandPilot says so plainly instead of showing a button that quietly does nothing.
+
+Intel AX200/AX201/AX210/AX211 and BE200/BE201/BE202, plus the Realtek, MediaTek and Qualcomm radios in mainstream laptops, all go down the same code path. There is no per-vendor branch and no model-string matching anywhere in the project — an earlier version matched Intel model names and picked the wrong adapter on every card that was not on the list.
+
+**On 6 GHz detection:** Wi-Fi 7 hardware is taken as 6 GHz capable. For Wi-Fi 6 cards the only trustworthy evidence is having *seen* a 6 GHz BSS, because scan results come from the card itself — so a 6E card proves itself the moment a 6 GHz AP is in range. Until then the state is reported as *unknown*, not *unsupported*: an absence of 6 GHz networks nearby looks identical to a card that cannot use them, and wrongly greying out 6 GHz on a capable AX211 is the worse error.
+
+---
+
 ## Features
 
 ### Bands & APs — the main event
-Lists every BSS (one entry per AP radio) grouped by network, showing band, channel, signal, Wi-Fi generation and BSSID. Pick one, click connect, and you are pinned to that exact radio.
+Every BSS (one entry per AP radio) grouped by network, showing band, channel, signal, Wi-Fi generation and BSSID. Pick one, click connect, and you are pinned to that exact radio.
 
-The **Rating** column is an opinionated guide rather than raw signal strength. Signal is only worth 60 of the 100 points, because a 2.4 GHz radio at -50 dBm is usually *slower* in practice than a 6 GHz one at -70 dBm — 2.4 GHz is narrow and crowded. Letting raw RSSI dominate would recommend exactly the wrong radio, which is the mistake this tool exists to prevent.
+The **Rating** column is an opinionated guide rather than raw signal strength. Signal is worth only 60 of the 100 points, because a 2.4 GHz radio at -50 dBm is usually *slower* in practice than a 6 GHz one at -70 dBm — 2.4 GHz is narrow and crowded. Letting raw RSSI dominate would recommend exactly the wrong radio, which is the mistake this tool exists to prevent.
+
+When you are on a lower-ranked radio than one available, the banner says so in plain words and offers a one-click switch. That contradiction — full signal bars on the third-best radio in the building — is the whole argument for the app.
 
 ### Adapter
-The driver's own radio settings — preferred band, roaming aggressiveness, channel widths — read live from the installed driver. Nothing is hardcoded to a driver revision, because the available keywords and accepted values genuinely differ between Intel driver versions for the same card. Use this to stop Windows wandering back to 2.4 GHz an hour after you pin.
+The driver's own radio settings, read live from the installed driver. Nothing is hardcoded to a driver revision, because the available keywords and accepted values genuinely differ between drivers and vendors for the same card. Use this to stop Windows wandering back to 2.4 GHz an hour after you pin.
 
 ### Priority & limits
-Per-application traffic prioritisation (DSCP marking) and bandwidth caps, implemented as standard Windows QoS policies written straight to the registry — so they work on Home editions, which have no `gpedit.msc`.
+Per-application traffic prioritisation and bandwidth caps, implemented as standard Windows QoS policies written straight to the registry — so they work on Home editions, which have no `gpedit.msc`. DSCP is presented as a ranked 1–7 scale rather than raw numbers, because DSCP `8` is *lower* priority than `0` and reads as a mistake otherwise.
 
 ### Live traffic
 Per-process upload and download rates via an ETW kernel session. Windows exposes no per-process network performance counter, so listening to kernel TCP/IP events is the only way to attribute bytes to a PID. Select a process and jump straight to creating a priority rule for it.
@@ -61,7 +76,7 @@ The binary lands in `dist\BandPilot.exe`.
 ## Requirements
 
 - Windows 10 or 11, 64-bit
-- A Wi-Fi adapter (built for Intel BE2xx, but the band picker works on any adapter Windows supports)
+- Any Wi-Fi adapter Windows supports
 - Administrator rights — required to pin a BSSID, write QoS policy, and open an ETW session
 - The network must already be saved in Windows, since BandPilot reuses the stored credentials rather than asking for them
 
@@ -70,10 +85,10 @@ The binary lands in `dist\BandPilot.exe`.
 ## How to use it
 
 1. Connect to the network normally through Windows once, so the password is saved.
-2. Open BandPilot as administrator. It preselects your Wi-Fi 7 adapter if you have more than one radio.
-3. On **Bands & APs**, tick *Only show the network I'm on* to cut the noise.
-4. You will typically see several rows under one network name. The `●` marks where you are now.
-5. Pick a row — usually the highest-rated 5 GHz or 6 GHz entry — and click **Connect to this access point**.
+2. Open BandPilot as administrator. It preselects the most capable adapter if you have more than one radio.
+3. **Bands & APs** opens with *Only my network* already ticked, which cuts a forty-row list to the three or four radios you can actually choose between.
+4. The `you are here` chip marks your current radio; `best available` marks the one worth moving to.
+5. Pick a row and click **Connect to this access point** — or just click the **Switch to…** button in the banner.
 6. If Windows drifts back later, open **Adapter** and lower *Roaming Aggressiveness*.
 
 ---
@@ -82,11 +97,11 @@ The binary lands in `dist\BandPilot.exe`.
 
 **Pinning is per-connection, not permanent.** It survives until the adapter roams, the radio resets, or you reconnect. The Adapter page settings are the standing preferences that make it stick.
 
-**Your driver has the final say.** `WlanConnect` with a desired-BSSID list is a strong constraint, but some drivers treat it as a hint and will still roam under a weak signal. This is a driver behaviour, not something an application can override.
+**Your driver has the final say.** `WlanConnect` with a desired-BSSID list is a strong constraint, but some drivers treat it as a hint and will still roam under a weak signal. This is driver behaviour, not something an application can override.
 
 **QoS priority needs two things you might not have.** Windows ignores DSCP policies on non-domain-joined PCs until a registry switch is set — use *Enable QoS marking* in the sidebar, then restart. Beyond that, DSCP marks only help end-to-end if your router honours them; many consumer routers ignore or strip them. Bandwidth *limits* apply locally and work regardless.
 
-**6 GHz needs everything to agree.** Your card, your driver, your router and your regulatory region all have to support 6 GHz for those radios to appear at all.
+**6 GHz needs everything to agree.** Your card, driver, router and regulatory region all have to support 6 GHz for those radios to appear at all.
 
 ---
 
@@ -96,25 +111,28 @@ The binary lands in `dist\BandPilot.exe`.
 src/
   Native/WlanApi.cs        P/Invoke for wlanapi.dll (structs, enums, entry points)
   Wifi/WifiService.cs      Scanning, BSS enumeration, BSSID-pinned connect
+  Wifi/AdapterCapability.cs  What the driver says the card can do
   Wifi/BandTools.cs        Frequency to band/channel, rating, formatting
   Adapter/                 Driver settings via the NetAdapter PowerShell module
   Qos/QosManager.cs        Windows QoS policy read/write
   Monitor/                 ETW per-process bandwidth accounting
-  Ui/                      WinForms UI, built in code (no designer files)
-tests/LayoutTests/         Struct layout and band-math verification
+  Ui/                      WPF: Theme.xaml holds every token, one file per page
+tests/LayoutTests/         Struct layout, band math and capability verification
 tools/Show-WifiBands.ps1   No-install PowerShell band viewer
 ```
 
+The UI is WPF. Everything outside `src/Ui` is UI-agnostic and was untouched by the move from WinForms.
+
 ### About the tests
 
-A wrong struct size or field offset in the Native Wifi layer does not crash — it silently yields plausible but incorrect signal strengths, channels and BSSIDs, which is far worse than a crash. `tests/LayoutTests` asserts every size and offset against the C headers, plus the channel arithmetic and the rating weights. It targets plain `net8.0`, so it runs on any OS:
+A wrong struct size or field offset in the Native Wifi layer does not crash — it silently yields plausible but incorrect signal strengths, channels and BSSIDs, which is far worse than a crash. `tests/LayoutTests` asserts every size and offset against the C headers, plus the channel arithmetic, the rating weights, and the capability rules that decide whether a 6 GHz row is offered or the connect button works at all. It targets plain `net8.0`, so it runs on any OS:
 
 ```bash
 cd tests/LayoutTests
 dotnet run -c Release
 ```
 
-This caught a real bug during development: the structs holding `WCHAR[256]` fields defaulted to ANSI marshalling, which would have halved their size and broken every read.
+This has caught two real bugs so far: structs holding `WCHAR[256]` fields defaulting to ANSI marshalling, which would have halved their size and broken every read; and a rating formula that scored a strong 2.4 GHz radio *above* a decent 6 GHz one, inverting the entire point of the tool.
 
 ---
 

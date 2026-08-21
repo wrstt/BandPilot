@@ -32,6 +32,13 @@ namespace BandPilot.Native
         internal static extern void WlanFreeMemory(IntPtr pMemory);
 
         [DllImport(Dll, SetLastError = true)]
+        internal static extern uint WlanGetInterfaceCapability(
+            IntPtr hClientHandle,
+            [In] ref Guid pInterfaceGuid,
+            IntPtr pReserved,
+            out IntPtr ppCapability);
+
+        [DllImport(Dll, SetLastError = true)]
         internal static extern uint WlanEnumInterfaces(
             IntPtr hClientHandle,
             IntPtr pReserved,
@@ -274,5 +281,32 @@ namespace BandPilot.Native
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
         internal string strProfileName;
         internal uint dwFlags;
+    }
+
+    internal enum WlanInterfaceType
+    {
+        EmulatedDot11 = 0,
+        Dot11 = 1,
+        Irda = 2,
+        Invalid = 3
+    }
+
+    /// <summary>
+    /// WLAN_INTERFACE_CAPABILITY. dwMaxDesiredBssidListSize is the field that
+    /// matters most here: a driver reporting 0 cannot honour a desired-BSSID
+    /// list at all, which means pinning to a specific radio is impossible on
+    /// that card no matter what the UI offers.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct WlanInterfaceCapability
+    {
+        internal WlanInterfaceType interfaceType;
+        [MarshalAs(UnmanagedType.Bool)]
+        internal bool bDot11DSupported;
+        internal uint dwMaxDesiredSsidListSize;
+        internal uint dwMaxDesiredBssidListSize;
+        internal uint dwNumberOfSupportedPhys;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
+        internal Dot11PhyType[] dot11PhyTypes;
     }
 }

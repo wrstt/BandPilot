@@ -1,0 +1,37 @@
+<UserControl x:Class="BandPilot.Ui.AboutPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FontFamily="{StaticResource F.Sans}">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="18,16,18,24" MaxWidth="580" HorizontalAlignment="Left">
+      <TextBlock Text="About" Style="{StaticResource T.PageTitle}"/>
+
+      <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="19"
+                 Text="BandPilot lets you choose which Wi-Fi radio you connect to. Windows picks one for you and shows you nothing; this gives the choice back."/>
+
+      <TextBlock Text="WHY BAND CHOICE MATTERS" Style="{StaticResource T.Kicker}"
+                 Foreground="{StaticResource B.Accent}" Margin="0,20,0,0"/>
+      <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"
+                 Text="A network name is not a radio. One SSID in a hotel or office is a 2.4 GHz radio, a 5 GHz radio and often a 6 GHz radio, on every access point in the building. The strongest signal is frequently the worst connection: 2.4 GHz travels furthest but is narrow and crowded, so a full-bars 2.4 GHz link is usually slower than a moderate 6 GHz one. That is why the rating here is not a signal meter."/>
+
+      <TextBlock Text="WORKS WITH ANY CARD" Style="{StaticResource T.Kicker}"
+                 Foreground="{StaticResource B.Accent}" Margin="0,20,0,0"/>
+      <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"
+                 Text="Nothing here is written for one vendor. BandPilot asks the driver what the card supports — its Wi-Fi generation, whether it has a 6 GHz radio, and whether it will accept a preferred access point — and adapts. Intel AX and BE parts, and the Realtek, MediaTek and Qualcomm radios in mainstream laptops, are all handled by the same code path."/>
+
+      <TextBlock Text="HOW PINNING BEHAVES" Style="{StaticResource T.Kicker}"
+                 Foreground="{StaticResource B.Accent}" Margin="0,20,0,0"/>
+      <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"
+                 Text="Choosing a radio applies to the current connection. It survives until the adapter roams, the radio resets, or you reconnect. The Adapter page holds the standing preferences that make it stick — lowering Roaming Aggressiveness is what stops Windows drifting back. Some drivers treat a preferred access point as a hint rather than a rule, and will still roam under a weak signal; that is driver behaviour an application cannot override."/>
+
+      <TextBlock Text="QOS CAVEATS" Style="{StaticResource T.Kicker}"
+                 Foreground="{StaticResource B.Accent}" Margin="0,20,0,0"/>
+      <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"
+                 Text="Windows ignores DSCP priority rules on PCs that are not domain-joined until a registry switch is set, which the sidebar can do for you. Beyond that, priority marks only help end to end if your router honours them, and many consumer routers ignore or strip them. Bandwidth limits apply locally and work regardless. Per-process traffic accounting uses an ETW kernel session and needs administrator rights."/>
+
+      <Border Height="1" Background="{StaticResource B.Hairline}" Margin="0,22,0,0"/>
+      <TextBlock Style="{StaticResource T.Dim}" FontSize="11.5" TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="17"
+                 Text="BandPilot v1.1.0 — independent software built on publicly documented Windows APIs. It contains no Intel code, is not derived from Intel Killer Performance Suite, and is not endorsed by or affiliated with Intel Corporation. Intel and Killer are trademarks of their respective owners, used only to describe compatibility."/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

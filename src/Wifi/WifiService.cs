@@ -83,7 +83,45 @@ namespace BandPilot.Wifi
             {
                 WlanApi.WlanFreeMemory(list);
             }
+
+            // Capability is queried per adapter after the list is freed, since
+            // it opens its own blob and there is no reason to hold both.
+            foreach (WifiAdapter a in result)
+            {
+                a.Capability = GetCapability(a.Guid);
+            }
             return result;
+        }
+
+        /// <summary>
+        /// Asks the driver what this card can do. Wrapped in a try because a
+        /// driver that does not implement the capability query should degrade to
+        /// "unknown" rather than stop the app: the query is advisory, and every
+        /// feature except the 6 GHz hints works without it.
+        /// </summary>
+        public AdapterCapability GetCapability(Guid adapter)
+        {
+            IntPtr blob = IntPtr.Zero;
+            try
+            {
+                uint rc = WlanApi.WlanGetInterfaceCapability(_handle, ref adapter, IntPtr.Zero, out blob);
+                if (rc != WlanApi.ERROR_SUCCESS || blob == IntPtr.Zero)
+                {
+                    return AdapterCapability.Unknown();
+                }
+
+                var native = (WlanInterfaceCapability)Marshal.PtrToStructure(
+                    blob, typeof(WlanInterfaceCapability));
+                return AdapterCapability.FromNative(native);
+            }
+            catch (Exception)
+            {
+                return AdapterCapability.Unknown();
+            }
+            finally
+            {
+                if (blob != IntPtr.Zero) WlanApi.WlanFreeMemory(blob);
+            }
         }
 
         /// <summary>
