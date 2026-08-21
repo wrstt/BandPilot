@@ -22,6 +22,7 @@ namespace BandPilot.Ui
         private List<AccessPoint> _scan = new List<AccessPoint>();
         private CurrentConnection _current;
         private readonly SignalHistory _history = new SignalHistory();
+        private readonly RoamingHold _hold;
         private bool _busy;
         private bool _loading;
 
@@ -34,6 +35,7 @@ namespace BandPilot.Ui
         {
             _shell = shell;
             _wifi = shell.Wifi;
+            _hold = new RoamingHold(_wifi);
             InitializeComponent();
 
             // Keeps the banner honest without re-scanning: the connection can
@@ -59,6 +61,9 @@ namespace BandPilot.Ui
         {
             if (_tick != null) _tick.Stop();
             ThemeManager.Changed -= OnThemeChanged;
+
+            // Background scanning must never be left switched off.
+            if (_hold != null) _hold.Dispose();
         }
 
         private bool _started;
@@ -609,87 +614,107 @@ namespace BandPilot.Ui
 
         /// <summary>
         /// Pinning a BSSID only holds until the driver decides to roam, so this
-        /// is the other half of the feature: find whatever this particular
-        /// driver calls its roaming control and turn it down.
+        /// is the other half of the feature. It applies the rungs that take
+        /// effect without dropping the link; the permanent one is offered
+        /// afterwards, with its disconnect stated up front.
         /// </summary>
-        private async void OnHoldRadio(object sender, RoutedEventArgs e)
+        private void OnHoldRadio(object sender, RoutedEventArgs e)
         {
             WifiAdapter a = SelectedAdapter;
             if (a == null || _busy) return;
 
-            BtnHold.IsEnabled = false;
-            Status("Looking for this driver's roaming setting…", "B.TextDim");
+            if (_hold.IsHeld)
+            {
+                _hold.Release();
+                UpdateHoldButton();
+                Status("Roaming released. Windows may move you to another radio again.", "B.TextDim");
+                return;
+            }
 
             try
             {
-                Guid guid = a.Guid;
-                string desc = a.Description;
-
-                var found = await Task.Run(() =>
+                if (!_hold.Apply(a.Guid))
                 {
-                    string key = AdapterRegistry.FindInstanceKey(guid, desc);
-                    if (key == null) return null;
-                    return RoamingLock.Find(AdapterRegistry.Read(key));
-                });
-
-                if (found == null)
-                {
-                    Status("Could not find this radio's driver key in the registry.", "B.WarnText");
+                    _shell.ShowNotice("This driver ignores both roaming brakes",
+                        "BandPilot asked the driver to treat this link as media traffic and to "
+                        + "stop background scanning, and it accepted neither. The permanent "
+                        + "option on the Adapter page may still work — look for a roaming "
+                        + "setting there.");
                     return;
                 }
 
-                if (found.Count == 0)
-                {
-                    _shell.ShowNotice("No roaming control on this driver",
-                        "This driver does not expose a roaming setting BandPilot can recognise, "
-                        + "so there is nothing to hold down. Your pinned radio will still last "
-                        + "for the current connection — it just cannot be made to stick across "
-                        + "a roam.\n\nThe Adapter page lists everything this driver does expose.");
-                    Status(string.Empty, "B.TextDim");
-                    return;
-                }
+                UpdateHoldButton();
+                Status("Roaming held (" + _hold.AppliedDescription
+                     + "). This lasts while BandPilot is open.", "B.Good");
 
-                var pending = found.FindAll(c => !c.AlreadySet);
-                if (pending.Count == 0)
-                {
-                    Status("Roaming is already turned down as far as this driver allows.", "B.Good");
-                    return;
-                }
-
-                string list = string.Join("\n", pending.ConvertAll(c => "    " + c.Describe()));
-                _shell.ShowConfirm(
-                    "Hold this radio",
-                    "Turn down this driver's roaming so Windows stops drifting off the access "
-                    + "point you chose:\n\n" + list
-                    + "\n\nThe Wi-Fi connection will drop briefly while the radio restarts. "
-                    + "You can undo it any time from the Adapter page.",
-                    "Hold the radio",
-                    () => ApplyHold(pending));
+                OfferPermanentHold(a);
             }
             catch (Exception ex)
             {
                 Status(ex.Message, "B.Bad");
             }
-            finally
+        }
+
+        private void UpdateHoldButton()
+        {
+            BtnHold.Content = _hold.IsHeld ? "Release hold" : "Hold this radio";
+        }
+
+        /// <summary>
+        /// The driver-keyword change is genuinely better — it survives restarts
+        /// and does not depend on BandPilot running — but applying it restarts
+        /// the radio and drops the connection. That trade is the user's to make,
+        /// so it is offered rather than assumed.
+        /// </summary>
+        private async void OfferPermanentHold(WifiAdapter a)
+        {
+            try
             {
-                BtnHold.IsEnabled = true;
+                Guid guid = a.Guid;
+                string desc = a.Description;
+
+                var pending = await Task.Run(() =>
+                {
+                    string key = AdapterRegistry.FindInstanceKey(guid, desc);
+                    if (key == null) return null;
+                    List<RoamingLock.Candidate> found = RoamingLock.Find(AdapterRegistry.Read(key));
+                    return found.FindAll(c => !c.AlreadySet);
+                });
+
+                if (pending == null || pending.Count == 0) return;
+
+                string list = string.Join("\n", pending.ConvertAll(c => "    " + c.Describe()));
+                _shell.ShowConfirm(
+                    "Make the hold permanent?",
+                    "The hold now in place lasts only while BandPilot is running. This driver "
+                    + "also exposes a setting that survives restarts:\n\n" + list
+                    + "\n\nApplying it restarts the radio, so the Wi-Fi connection will drop for "
+                    + "a few seconds and you will need to reconnect to your chosen access point. "
+                    + "You can undo it any time from the Adapter page.",
+                    "Change the driver setting",
+                    () => ApplyPermanentHold(pending));
+            }
+            catch (Exception)
+            {
+                // The soft hold already succeeded; failing to offer the permanent
+                // upgrade is not worth interrupting the user for.
             }
         }
 
-        private async void ApplyHold(System.Collections.Generic.List<RoamingLock.Candidate> pending)
+        private async void ApplyPermanentHold(List<RoamingLock.Candidate> pending)
         {
             WifiAdapter a = SelectedAdapter;
             if (a == null) return;
 
             BtnHold.IsEnabled = false;
-            Status("Holding the radio…", "B.Accent");
+            Status("Applying — the connection will drop briefly…", "B.Accent");
 
             try
             {
                 Guid guid = a.Guid;
                 string desc = a.Description;
 
-                int applied = await Task.Run(() =>
+                await Task.Run(() =>
                 {
                     string name = AdapterProperties.ResolveAdapterName(guid, desc);
                     if (name == null)
@@ -697,20 +722,14 @@ namespace BandPilot.Ui
                         throw new InvalidOperationException(
                             "Could not match this radio to a Windows network adapter.");
                     }
-
-                    int count = 0;
                     foreach (RoamingLock.Candidate c in pending)
                     {
                         AdapterProperties.SetAdvanced(name, c.Property.RegistryKeyword, c.TargetValue);
-                        count++;
                     }
-                    return count;
                 });
 
-                Status(applied == 1
-                    ? "Roaming turned down. Your chosen radio should now stick."
-                    : applied + " roaming settings turned down. Your chosen radio should now stick.",
-                    "B.Good");
+                Status("Roaming turned down permanently. Reconnect to your chosen access point.",
+                       "B.Good");
             }
             catch (Exception ex)
             {

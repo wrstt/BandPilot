@@ -125,6 +125,58 @@ namespace BandPilot.Wifi
         }
 
         /// <summary>
+        /// Tells the driver this link is carrying media, which every driver
+        /// worth the name responds to by suppressing off-channel scans and
+        /// raising its roaming threshold.
+        ///
+        /// This is the gentle way to hold a pinned radio: it takes effect
+        /// immediately, does not touch the miniport, and does not drop the
+        /// connection — unlike changing a driver keyword, which restarts the
+        /// radio and tears down the very pin it was meant to protect.
+        /// </summary>
+        public void SetMediaStreamingMode(Guid adapter, bool on)
+        {
+            SetBool(adapter, WlanIntfOpcode.MediaStreamingMode, on);
+        }
+
+        /// <summary>
+        /// Turns the driver's background scanning off. With no candidate list a
+        /// driver has nothing to roam to, whatever its aggressiveness setting
+        /// says.
+        ///
+        /// This is machine-global and survives this process, so whoever turns it
+        /// off owns turning it back on. Leaving it off silently stops the
+        /// machine finding networks at all, with nothing pointing at BandPilot
+        /// as the cause.
+        /// </summary>
+        public void SetBackgroundScan(Guid adapter, bool enabled)
+        {
+            SetBool(adapter, WlanIntfOpcode.BackgroundScanEnabled, enabled);
+        }
+
+        private void SetBool(Guid adapter, WlanIntfOpcode opcode, bool value)
+        {
+            IntPtr buffer = Marshal.AllocHGlobal(sizeof(int));
+            try
+            {
+                // These opcodes take a Win32 BOOL, which is a 4-byte int.
+                Marshal.WriteInt32(buffer, value ? 1 : 0);
+
+                uint rc = WlanApi.WlanSetInterface(
+                    _handle, ref adapter, opcode, sizeof(int), buffer, IntPtr.Zero);
+
+                if (rc != WlanApi.ERROR_SUCCESS)
+                {
+                    throw new Win32Exception((int)rc, "WlanSetInterface(" + opcode + ") failed.");
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        /// <summary>
         /// Asks the driver to run a fresh scan. This returns immediately; the
         /// results land in the BSS list a few seconds later, so callers should
         /// wait before calling <see cref="GetAccessPoints"/> again.
@@ -159,14 +211,21 @@ namespace BandPilot.Wifi
 
             try
             {
-                int count = Marshal.ReadInt32(bssList, 4);   // dwNumberOfItems
-                IntPtr cursor = IntPtr.Add(bssList, 8);      // entries start here
+                int totalSize = Marshal.ReadInt32(bssList, 0);   // dwTotalSize
+                int count = Marshal.ReadInt32(bssList, 4);       // dwNumberOfItems
+                IntPtr cursor = IntPtr.Add(bssList, 8);          // entries start here
                 int stride = Marshal.SizeOf(typeof(WlanBssEntry));
 
                 for (int i = 0; i < count; i++)
                 {
-                    var e = (WlanBssEntry)Marshal.PtrToStructure(
-                        IntPtr.Add(cursor, i * stride), typeof(WlanBssEntry));
+                    // The entry pointer has to be kept, not just the marshalled
+                    // copy: ulIeOffset is relative to the entry base and points
+                    // past the end of the struct, so the beacon data is
+                    // unreachable once only the managed copy survives.
+                    IntPtr entryPtr = IntPtr.Add(cursor, i * stride);
+                    var e = (WlanBssEntry)Marshal.PtrToStructure(entryPtr, typeof(WlanBssEntry));
+
+                    byte[] ies = ReadIeBlob(entryPtr, e, 8 + i * stride, totalSize);
 
                     int mhz = BandTools.FrequencyKhzToMhz(e.ulChCenterFrequency);
                     var ap = new AccessPoint
@@ -179,8 +238,11 @@ namespace BandPilot.Wifi
                         FrequencyMhz = mhz,
                         Channel = BandTools.ChannelFromMhz(mhz),
                         Band = BandTools.BandFromMhz(mhz),
-                        Phy = e.dot11BssPhyType
+                        Phy = e.dot11BssPhyType,
+                        Beacon = ies
                     };
+
+                    ap.ApplyBeaconData();
 
                     if (current != null && current.Connected)
                     {
@@ -194,6 +256,38 @@ namespace BandPilot.Wifi
                 WlanApi.WlanFreeMemory(bssList);
             }
             return result;
+        }
+
+        /// <summary>
+        /// Copies the beacon information elements out of unmanaged memory.
+        ///
+        /// Bounds are checked against the list's own reported total size before
+        /// the copy, because ulIeOffset and ulIeSize come from the access point
+        /// rather than from Windows. A malformed beacon costs one BSS its extra
+        /// detail; it must never be able to read past the buffer.
+        /// </summary>
+        private static byte[] ReadIeBlob(IntPtr entryPtr, WlanBssEntry e, int entryOffset, int totalSize)
+        {
+            // Zero is normal, not an error: virtual and some USB adapters report
+            // no beacon data at all.
+            if (e.ulIeSize == 0 || e.ulIeOffset == 0) return null;
+
+            // Sanity ceiling. A beacon cannot legitimately carry megabytes.
+            if (e.ulIeSize > 4096) return null;
+
+            long end = (long)entryOffset + e.ulIeOffset + e.ulIeSize;
+            if (totalSize > 0 && end > totalSize) return null;
+
+            try
+            {
+                var buffer = new byte[e.ulIeSize];
+                Marshal.Copy(IntPtr.Add(entryPtr, (int)e.ulIeOffset), buffer, 0, (int)e.ulIeSize);
+                return buffer;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         public CurrentConnection GetCurrentConnection(Guid adapter)

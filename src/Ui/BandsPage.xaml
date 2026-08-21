@@ -29,15 +29,16 @@
     <DataTemplate DataType="{x:Type ui:ApRow}">
       <Grid Height="36" Margin="12,0" Opacity="{Binding RowOpacity}">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="74"/>
-          <ColumnDefinition Width="38"/>
-          <ColumnDefinition Width="62"/>
-          <ColumnDefinition Width="44"/>
-          <ColumnDefinition Width="64"/>
+          <ColumnDefinition Width="72"/>
+          <ColumnDefinition Width="34"/>
+          <ColumnDefinition Width="58"/>
+          <ColumnDefinition Width="40"/>
+          <ColumnDefinition Width="58"/>
+          <ColumnDefinition Width="112"/>
+          <ColumnDefinition Width="52"/>
+          <ColumnDefinition Width="*" MinWidth="104"/>
+          <ColumnDefinition Width="88"/>
           <ColumnDefinition Width="92"/>
-          <ColumnDefinition Width="*" MinWidth="110"/>
-          <ColumnDefinition Width="92"/>
-          <ColumnDefinition Width="104"/>
         </Grid.ColumnDefinitions>
 
         <!-- band pill -->
@@ -66,14 +67,19 @@
         <TextBlock Grid.Column="5" Text="{Binding Generation}" Style="{StaticResource T.Secondary}"
                    FontSize="12"/>
 
-        <TextBox Grid.Column="6" Text="{Binding Bssid, Mode=OneWay}" IsReadOnly="True"
+        <!-- The AP's own airtime measurement. Absent on much consumer gear,
+             which is why it reads as unknown rather than as zero. -->
+        <TextBlock Grid.Column="6" Text="{Binding BusyText}" FontSize="12" VerticalAlignment="Center"
+                   Foreground="{Binding BusyBrush}" ToolTip="{Binding BusyTooltip}"/>
+
+        <TextBox Grid.Column="7" Text="{Binding Bssid, Mode=OneWay}" IsReadOnly="True"
                  BorderThickness="0" Background="Transparent" Padding="0"
                  FontFamily="{StaticResource F.Mono}" FontSize="11.5"
                  Foreground="{DynamicResource B.TextSecondary}" VerticalAlignment="Center"
                  Cursor="IBeam" ToolTip="Select to copy"/>
 
         <!-- rating: mini bar plus number, both in the threshold colour -->
-        <Grid Grid.Column="7" VerticalAlignment="Center">
+        <Grid Grid.Column="8" VerticalAlignment="Center">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="Auto"/>
@@ -88,7 +94,7 @@
                      Foreground="{Binding RatingBrush}" VerticalAlignment="Center"/>
         </Grid>
 
-        <Border Grid.Column="8" Visibility="{Binding ChipVisibility}" CornerRadius="99"
+        <Border Grid.Column="9" Visibility="{Binding ChipVisibility}" CornerRadius="99"
                 Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Center"
                 BorderThickness="1" BorderBrush="{Binding ChipBrush}">
           <TextBlock Text="{Binding ChipText}" FontSize="10" Foreground="{Binding ChipBrush}"/>
@@ -242,15 +248,16 @@
                 Padding="12,10">
           <Grid>
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="74"/>
-              <ColumnDefinition Width="38"/>
-              <ColumnDefinition Width="62"/>
-              <ColumnDefinition Width="44"/>
-              <ColumnDefinition Width="64"/>
+              <ColumnDefinition Width="72"/>
+              <ColumnDefinition Width="34"/>
+              <ColumnDefinition Width="58"/>
+              <ColumnDefinition Width="40"/>
+              <ColumnDefinition Width="58"/>
+              <ColumnDefinition Width="112"/>
+              <ColumnDefinition Width="52"/>
+              <ColumnDefinition Width="*" MinWidth="104"/>
+              <ColumnDefinition Width="88"/>
               <ColumnDefinition Width="92"/>
-              <ColumnDefinition Width="*" MinWidth="110"/>
-              <ColumnDefinition Width="92"/>
-              <ColumnDefinition Width="104"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="BAND" Style="{StaticResource T.Kicker}"/>
             <TextBlock Grid.Column="1" Text="CH" Style="{StaticResource T.Kicker}"
@@ -259,9 +266,10 @@
             <TextBlock Grid.Column="3" Text="DBM" Style="{StaticResource T.Kicker}"
                        HorizontalAlignment="Right" Margin="0,0,8,0"/>
             <TextBlock Grid.Column="4" Text="TREND" Style="{StaticResource T.Kicker}"/>
-            <TextBlock Grid.Column="5" Text="GENERATION" Style="{StaticResource T.Kicker}"/>
-            <TextBlock Grid.Column="6" Text="ACCESS POINT (BSSID)" Style="{StaticResource T.Kicker}"/>
-            <TextBlock Grid.Column="7" Text="RATING" Style="{StaticResource T.Kicker}"/>
+            <TextBlock Grid.Column="5" Text="RADIO · MHZ" Style="{StaticResource T.Kicker}"/>
+            <TextBlock Grid.Column="6" Text="BUSY" Style="{StaticResource T.Kicker}"/>
+            <TextBlock Grid.Column="7" Text="ACCESS POINT (BSSID)" Style="{StaticResource T.Kicker}"/>
+            <TextBlock Grid.Column="8" Text="RATING" Style="{StaticResource T.Kicker}"/>
           </Grid>
         </Border>
 

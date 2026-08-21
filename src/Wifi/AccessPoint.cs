@@ -16,9 +16,62 @@ namespace BandPilot.Wifi
         public Dot11PhyType Phy { get; set; }
         public bool IsCurrent { get; set; }
 
+        /// <summary>Raw beacon information elements, or null when none were reported.</summary>
+        public byte[] Beacon { get; set; }
+
+        /// <summary>Occupied channel width in MHz. 20 until a beacon says otherwise.</summary>
+        public int WidthMhz { get; set; }
+
+        public bool WidthKnown { get; set; }
+
+        /// <summary>Stations associated with this AP, or -1 when not advertised.</summary>
+        public int StationCount { get; set; }
+
+        /// <summary>
+        /// How busy the AP measured its own channel, or -1 when not advertised.
+        /// Absent on a lot of consumer gear, which is why nothing may depend on
+        /// it alone.
+        /// </summary>
+        public int ChannelUtilisationPercent { get; set; }
+
+        public bool HasAirtimeData { get { return ChannelUtilisationPercent >= 0; } }
+
+        /// <summary>Reads the beacon, if there is one. Safe to call twice.</summary>
+        public void ApplyBeaconData()
+        {
+            WidthMhz = 20;
+            StationCount = -1;
+            ChannelUtilisationPercent = -1;
+
+            if (Beacon == null) return;
+
+            InformationElements.Parsed p = InformationElements.Parse(Beacon);
+            WidthMhz = p.WidthMhz;
+            WidthKnown = p.WidthKnown;
+            StationCount = p.StationCount;
+            ChannelUtilisationPercent = p.ChannelUtilisationPercent;
+
+            // A hidden network reports an empty SSID in the struct but often
+            // still carries one in the beacon.
+            if (string.IsNullOrEmpty(Ssid) && !string.IsNullOrEmpty(p.Ssid)) Ssid = p.Ssid;
+        }
+
+        public string WidthLabel
+        {
+            get { return WidthKnown ? WidthMhz + " MHz" : "—"; }
+        }
+
         public string BandLabel { get { return BandTools.BandLabel(Band); } }
         public string PhyLabel { get { return BandTools.PhyLabel(Phy); } }
-        public int Score { get { return BandTools.QualityScore(RssiDbm, Band, Phy); } }
+        public int Score
+        {
+            get
+            {
+                return BandTools.QualityScore(RssiDbm, Band, Phy,
+                    WidthKnown ? WidthMhz : 0,
+                    ChannelUtilisationPercent);
+            }
+        }
         public int Bars { get { return BandTools.SignalBars(RssiDbm); } }
 
         /// <summary>

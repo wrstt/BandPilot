@@ -37,6 +37,7 @@ namespace BandPilot.Tests
             CapabilityRules();
             RoamingLockRules();
             SignalHistoryRules();
+            BeaconParsing();
 
             Console.WriteLine();
             Console.WriteLine(_failures == 0
@@ -235,6 +236,144 @@ namespace BandPilot.Tests
             Eq("lookup is case-insensitive", history.For("aa:bb:cc:dd:ee:ff").Count, SignalHistory.Capacity);
         }
 
+        /// <summary>
+        /// Beacon parsing reads bytes written by whatever access point happens
+        /// to be in range, so the inputs are hostile by default. These fixtures
+        /// are hand-built to the 802.11 field layouts; a width read wrongly
+        /// produces a confidently incorrect ranking rather than an error, which
+        /// is the failure mode this whole suite exists to catch.
+        /// </summary>
+        private static void BeaconParsing()
+        {
+            Section("Beacon - malformed input is survivable");
+
+            Eq("null blob defaults to 20 MHz", InformationElements.Parse(null).WidthMhz, 20);
+            Eq("empty blob defaults to 20 MHz", InformationElements.Parse(new byte[0]).WidthMhz, 20);
+            Bool("nothing is claimed to be known",
+                InformationElements.Parse(null).WidthKnown, false);
+
+            // A length field running past the buffer is the classic overread.
+            byte[] truncated = { 61, 200, 0x24, 0x05 };
+            Eq("an over-long element does not read past the end",
+                InformationElements.Parse(truncated).WidthMhz, 20);
+
+            byte[] ragged = { 0 };
+            Eq("a one-byte blob is ignored", InformationElements.Parse(ragged).WidthMhz, 20);
+
+            Section("Beacon - BSS Load (element 11)");
+
+            // 12 stations, utilisation 128/255 = 50%, admission capacity 0.
+            byte[] load = Ie(11, 0x0C, 0x00, 128, 0x00, 0x00);
+            InformationElements.Parsed p = InformationElements.Parse(load);
+            Eq("station count is little-endian", p.StationCount, 12);
+            Eq("utilisation is scaled from 255, not 100", p.ChannelUtilisationPercent, 50);
+            Bool("airtime data is flagged present", p.HasBssLoad, true);
+
+            Eq("a fully busy channel reads 100",
+                InformationElements.Parse(Ie(11, 0, 0, 255, 0, 0)).ChannelUtilisationPercent, 100);
+            Eq("an idle channel reads 0",
+                InformationElements.Parse(Ie(11, 0, 0, 0, 0, 0)).ChannelUtilisationPercent, 0);
+            Bool("absent BSS Load is reported as unknown, not as zero",
+                InformationElements.Parse(Ie(61, 0x24, 0x05)).HasBssLoad, false);
+
+            Section("Beacon - channel width");
+
+            // HT Operation: secondary channel present AND wide operation allowed.
+            Eq("HT with a secondary channel is 40 MHz",
+                InformationElements.Parse(Ie(61, 36, 0x05)).WidthMhz, 40);
+            Eq("HT with no secondary channel is 20 MHz",
+                InformationElements.Parse(Ie(61, 36, 0x00)).WidthMhz, 20);
+            // Offset set but wide operation withheld: still 20.
+            Eq("HT needs both bits to mean 40 MHz",
+                InformationElements.Parse(Ie(61, 36, 0x01)).WidthMhz, 20);
+
+            // VHT Operation: width 1 with no second segment is 80 MHz.
+            Eq("VHT width 1 is 80 MHz",
+                InformationElements.Parse(Ie(192, 1, 42, 0)).WidthMhz, 80);
+            // Two segments eight apart is a contiguous 160.
+            Eq("VHT segments 8 apart are 160 MHz",
+                InformationElements.Parse(Ie(192, 1, 42, 50)).WidthMhz, 160);
+            // Width 0 defers to HT rather than claiming anything.
+            Eq("VHT width 0 defers to the HT element",
+                InformationElements.Parse(Concat(Ie(61, 36, 0x05), Ie(192, 0, 0, 0))).WidthMhz, 40);
+
+            // EHT Operation: params bit 0 set, 4 bytes MCS, then control = 4.
+            Eq("EHT control 4 is 320 MHz",
+                InformationElements.Parse(Ext(106, 0x01, 0, 0, 0, 0, 0x04, 0, 0)).WidthMhz, 320);
+            Eq("EHT control 3 is 160 MHz",
+                InformationElements.Parse(Ext(106, 0x01, 0, 0, 0, 0, 0x03, 0, 0)).WidthMhz, 160);
+            Bool("EHT without operation info present is not trusted",
+                InformationElements.Parse(Ext(106, 0x00, 0, 0, 0, 0, 0x04, 0, 0)).WidthKnown, false);
+
+            // Wi-Fi 7 APs carry the older elements too, describing a narrower
+            // channel. The newest element has to win or every 320 MHz AP is
+            // reported as 80.
+            byte[] mixed = Concat(
+                Ie(61, 36, 0x05),                                 // HT says 40
+                Ie(192, 1, 42, 0),                                // VHT says 80
+                Ext(106, 0x01, 0, 0, 0, 0, 0x04, 0, 0));          // EHT says 320
+            Eq("EHT beats VHT and HT on a Wi-Fi 7 beacon",
+                InformationElements.Parse(mixed).WidthMhz, 320);
+
+            Section("Beacon - HE 6 GHz operation");
+
+            // HE Operation Parameters bit 21 = 6 GHz info present. Bits 18 and
+            // 19 clear, so the 6 GHz block sits immediately after the fixed part.
+            // params = 1 << 21 = 0x200000 -> bytes 00 00 20
+            byte[] he6 = Ext(36, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00,
+                             40, 0x02, 0, 0, 0);
+            Eq("HE 6 GHz control 2 is 80 MHz", InformationElements.Parse(he6).WidthMhz, 80);
+
+            byte[] he6wide = Ext(36, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00,
+                                 40, 0x03, 0, 0, 0);
+            Eq("HE 6 GHz control 3 is 160 MHz", InformationElements.Parse(he6wide).WidthMhz, 160);
+
+            // Bit 21 clear: there is no 6 GHz block to read, and stepping into
+            // one anyway would parse whatever bytes follow.
+            byte[] heNo6 = Ext(36, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+            Bool("HE without the 6 GHz flag claims no width",
+                InformationElements.Parse(heNo6).WidthKnown, false);
+
+            Section("Beacon - SSID recovery");
+            byte[] hidden = Concat(Ie(0, (byte)'H', (byte)'i'), Ie(11, 1, 0, 51, 0, 0));
+            Str("a hidden network's SSID is recovered from the beacon",
+                InformationElements.Parse(hidden).Ssid, "Hi");
+        }
+
+        /// <summary>Builds one information element: id, length, body.</summary>
+        private static byte[] Ie(byte id, params byte[] body)
+        {
+            var b = new byte[2 + body.Length];
+            b[0] = id;
+            b[1] = (byte)body.Length;
+            Array.Copy(body, 0, b, 2, body.Length);
+            return b;
+        }
+
+        /// <summary>Builds an extension element (id 255) with its sub-id.</summary>
+        private static byte[] Ext(byte extId, params byte[] body)
+        {
+            var full = new byte[1 + body.Length];
+            full[0] = extId;
+            Array.Copy(body, 0, full, 1, body.Length);
+            return Ie(255, full);
+        }
+
+        private static byte[] Concat(params byte[][] parts)
+        {
+            int n = 0;
+            foreach (byte[] part in parts) n += part.Length;
+
+            var result = new byte[n];
+            int at = 0;
+            foreach (byte[] part in parts)
+            {
+                Array.Copy(part, 0, result, at, part.Length);
+                at += part.Length;
+            }
+            return result;
+        }
+
         private static void Bool(string what, bool actual, bool expected)
         {
             _checks++;
@@ -418,6 +557,45 @@ namespace BandPilot.Tests
             if (!ok) _failures++;
             Console.WriteLine("  [{0}] {1,-52} {2} vs {3}",
                 ok ? "ok" : "FAIL", "-90 dBm on 6 GHz loses to -50 dBm on 2.4 GHz", dead6, strong24);
+
+            Section("Rating - measured congestion");
+
+            // The point of parsing beacons: a busy wide channel is worse than a
+            // quiet narrow one, and no signal-strength model can see that.
+            int busyWide = BandTools.QualityScore(-60, WifiBand.Band6, Dot11PhyType.Eht, 320, 90);
+            int quietNarrow = BandTools.QualityScore(-60, WifiBand.Band5, Dot11PhyType.He, 80, 5);
+            _checks++;
+            ok = quietNarrow > busyWide;
+            if (!ok) _failures++;
+            Console.WriteLine("  [{0}] {1,-52} {2} vs {3}", ok ? "ok" : "FAIL",
+                "a quiet 80 MHz beats a congested 320 MHz", quietNarrow, busyWide);
+
+            // ...but with the air clear, width wins decisively.
+            int quietWide = BandTools.QualityScore(-60, WifiBand.Band6, Dot11PhyType.Eht, 320, 5);
+            _checks++;
+            ok = quietWide > quietNarrow;
+            if (!ok) _failures++;
+            Console.WriteLine("  [{0}] {1,-52} {2} vs {3}", ok ? "ok" : "FAIL",
+                "with clear air, 320 MHz beats 80 MHz", quietWide, quietNarrow);
+
+            // Signal still gates everything: an unreachable radio scores nothing
+            // no matter how good its specification is.
+            Eq("an unreachable 320 MHz radio scores zero",
+                BandTools.QualityScore(-92, WifiBand.Band6, Dot11PhyType.Eht, 320, 0), 0);
+
+            // Measured data must override the band estimate, or parsing beacons
+            // would have been pointless.
+            int measuredBusy6 = BandTools.QualityScore(-55, WifiBand.Band6, Dot11PhyType.Eht, 160, 95);
+            int estimated6 = BandTools.QualityScore(-55, WifiBand.Band6, Dot11PhyType.Eht, 0, -1);
+            _checks++;
+            ok = measuredBusy6 < estimated6;
+            if (!ok) _failures++;
+            Console.WriteLine("  [{0}] {1,-52} {2} vs {3}", ok ? "ok" : "FAIL",
+                "a measured-busy 6 GHz scores below the estimate", measuredBusy6, estimated6);
+
+            Eq("width is capped, not extrapolated past 320 MHz",
+                BandTools.QualityScore(-40, WifiBand.Band6, Dot11PhyType.Eht, 1280, 0),
+                BandTools.QualityScore(-40, WifiBand.Band6, Dot11PhyType.Eht, 320, 0));
 
             Section("Signal bars");
             Eq("-50 dBm", BandTools.SignalBars(-50), 4);

@@ -73,6 +73,15 @@ namespace BandPilot.Native
             IntPtr pWlanOpcodeValueType);
 
         [DllImport(Dll, SetLastError = true)]
+        internal static extern uint WlanSetInterface(
+            IntPtr hClientHandle,
+            ref Guid pInterfaceGuid,
+            WlanIntfOpcode OpCode,
+            uint dwDataSize,
+            IntPtr pData,
+            IntPtr pReserved);
+
+        [DllImport(Dll, SetLastError = true)]
         internal static extern uint WlanConnect(
             IntPtr hClientHandle,
             ref Guid pInterfaceGuid,

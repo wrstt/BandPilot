@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
@@ -61,7 +62,64 @@ namespace BandPilot.Ui
         public string BandLabel { get { return Ap.BandLabel; } }
         public string Channel { get { return Ap.Channel.ToString(); } }
         public string Dbm { get { return Ap.RssiDbm.ToString(); } }
-        public string Generation { get { return Ap.PhyLabel; } }
+        /// <summary>
+        /// Generation and width together, because on their own neither says how
+        /// fast a radio can go. "Wi-Fi 7" at 20 MHz is slower than "Wi-Fi 6" at
+        /// 160, and width is invisible everywhere else in Windows.
+        /// </summary>
+        public string Generation
+        {
+            get
+            {
+                string phy = Ap.PhyLabel;
+                int cut = phy.IndexOf(" (", StringComparison.Ordinal);
+                if (cut > 0) phy = phy.Substring(0, cut);
+                return Ap.WidthKnown ? phy + " · " + Ap.WidthMhz : phy;
+            }
+        }
+
+        /// <summary>
+        /// The access point's own measurement of how busy its channel is. This
+        /// is the most honest congestion figure obtainable, because it counts
+        /// airtime lost to hidden nodes, interference and slow legacy clients —
+        /// none of which any signal-strength model can detect. Plenty of
+        /// consumer routers never send it, so absence has to read as unknown
+        /// rather than as zero.
+        /// </summary>
+        public string BusyText
+        {
+            get { return Ap.HasAirtimeData ? Ap.ChannelUtilisationPercent + "%" : "—"; }
+        }
+
+        public Brush BusyBrush
+        {
+            get
+            {
+                if (!Ap.HasAirtimeData) return Res("B.TextFaint");
+                int busy = Ap.ChannelUtilisationPercent;
+                if (busy >= 60) return Res("B.Bad");
+                if (busy >= 30) return Res("B.WarnRail");
+                return Res("B.Good");
+            }
+        }
+
+        public string BusyTooltip
+        {
+            get
+            {
+                if (!Ap.HasAirtimeData)
+                {
+                    return "This access point does not report channel utilisation, so its "
+                         + "rating uses a band-typical estimate instead.";
+                }
+
+                string clients = Ap.StationCount >= 0
+                    ? Ap.StationCount + (Ap.StationCount == 1 ? " client" : " clients") + " · "
+                    : string.Empty;
+                return clients + "the AP measured its channel busy "
+                     + Ap.ChannelUtilisationPercent + "% of the time";
+            }
+        }
         public string Bssid { get { return Ap.Bssid; } }
         public int Score { get { return Ap.Score; } }
 

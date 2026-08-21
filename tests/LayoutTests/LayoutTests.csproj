@@ -18,6 +18,7 @@
     <Compile Include="../../src/Wifi/AccessPoint.cs" />
     <Compile Include="../../src/Wifi/AdapterCapability.cs" />
     <Compile Include="../../src/Wifi/SignalHistory.cs" />
+    <Compile Include="../../src/Wifi/InformationElements.cs" />
     <Compile Include="../../src/Adapter/AdapterProperties.cs" />
     <Compile Include="../../src/Adapter/RoamingLock.cs" />
   </ItemGroup>

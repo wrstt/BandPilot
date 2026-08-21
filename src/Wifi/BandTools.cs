@@ -95,48 +95,119 @@ namespace BandPilot.Wifi
         }
 
         /// <summary>
-        /// A 0-100 score used only for sorting and colouring the AP list. It is
-        /// deliberately not "signal strength": a strong 2.4 GHz AP is usually a
-        /// worse choice than a moderate 6 GHz one on a crowded hotel network,
-        /// which is exactly the judgement call this tool exists to make easier.
+        /// Legacy shape, kept for callers with no beacon data. Width and airtime
+        /// are estimated from the band and PHY.
         /// </summary>
         public static int QualityScore(int rssiDbm, WifiBand band, Dot11PhyType phy)
         {
-            // Signal is deliberately worth only 60 of the 100 points. A 2.4 GHz
-            // radio at -50 dBm is typically slower in practice than a 6 GHz one
-            // at -70, because 2.4 GHz is narrow and crowded, so letting raw RSSI
-            // dominate would recommend exactly the wrong radio. The weights are
-            // pinned by the tests in tests/LayoutTests.
-            double normalised = (rssiDbm + 90) / 50.0;      // -90..-40 dBm -> 0..1
-            if (normalised < 0.0) normalised = 0.0;
-            if (normalised > 1.0) normalised = 1.0;
-            int signal = (int)Math.Round(normalised * 60.0);
-
-            int bandBonus;
-            switch (band)
-            {
-                case WifiBand.Band6: bandBonus = 32; break;   // widest, least congested
-                case WifiBand.Band5: bandBonus = 18; break;
-                case WifiBand.Band24: bandBonus = 0; break;   // range at the cost of throughput
-                default: bandBonus = 0; break;
-            }
-
-            int phyBonus;
-            switch (phy)
-            {
-                case Dot11PhyType.Eht: phyBonus = 8; break;
-                case Dot11PhyType.He: phyBonus = 5; break;
-                case Dot11PhyType.Vht: phyBonus = 2; break;
-                default: phyBonus = 0; break;
-            }
-
-            int score = signal + bandBonus + phyBonus;
-            if (score < 0) score = 0;
-            if (score > 100) score = 100;
-            return score;
+            return QualityScore(rssiDbm, band, phy, 0, -1);
         }
 
-        /// <summary>Signal bars 0-4, from raw RSSI only.</summary>
+        /// <summary>
+        /// How good a radio is actually likely to be, not how loud it is.
+        ///
+        /// The model is throughput potential gated by whether you can hear the
+        /// AP at all:
+        ///
+        ///     score = signal + (width + free airtime) x usability
+        ///
+        /// The important part is that band membership carries no bonus of its
+        /// own any more. It used to: 6 GHz scored +32 and 5 GHz +18, which was
+        /// really a stand-in for "those bands are usually emptier and wider".
+        /// Now that width and airtime can be measured from the beacon, keeping
+        /// that bonus would count the same advantage twice and over-favour
+        /// 6 GHz. Where a beacon is silent the band is still used — but as an
+        /// estimate of width and busyness, which is what it was always standing
+        /// in for.
+        ///
+        /// The consequence worth knowing: wider is not better when busy. An
+        /// 80 MHz channel only transmits when all four of its 20 MHz subchannels
+        /// are clear, so a congested 320 MHz radio deservedly loses to a quiet
+        /// 80 MHz one — exactly the judgement this tool exists to make.
+        /// </summary>
+        /// <param name="widthMhz">Occupied width, or 0 when the beacon did not say.</param>
+        /// <param name="busyPercent">Measured channel utilisation, or -1 when unknown.</param>
+        public static int QualityScore(int rssiDbm, WifiBand band, Dot11PhyType phy,
+                                       int widthMhz, int busyPercent)
+        {
+            // Signal is worth 40 of 100. Enough to matter, not enough to let a
+            // loud, narrow, crowded 2.4 GHz radio win on volume alone.
+            double signal = Clamp01((rssiDbm + 90) / 50.0) * 40.0;
+
+            // Potential is worthless if the link will not hold. This falls to
+            // zero at -90 dBm, so an unreachable 320 MHz radio scores nothing
+            // rather than coasting on its specification.
+            double usability = Clamp01((rssiDbm + 90) / 30.0);
+
+            int width = widthMhz > 0 ? widthMhz : EstimateWidth(band, phy);
+            double widthPart = WidthScore(width) * 25.0;
+
+            double busy = busyPercent >= 0
+                ? Clamp01(busyPercent / 100.0)
+                : EstimateBusy(band);
+            double airtimePart = (1.0 - busy) * 35.0;
+
+            double score = signal + (widthPart + airtimePart) * usability;
+
+            if (score < 0) score = 0;
+            if (score > 100) score = 100;
+            return (int)Math.Round(score);
+        }
+
+        /// <summary>
+        /// Doubling the width does not double throughput in practice, so this is
+        /// logarithmic: 20 MHz scores 0 and 320 MHz scores 1.
+        /// </summary>
+        private static double WidthScore(int widthMhz)
+        {
+            if (widthMhz <= 20) return 0.0;
+            double steps = Math.Log(widthMhz / 20.0, 2.0);   // 40 -> 1 ... 320 -> 4
+            return Clamp01(steps / 4.0);
+        }
+
+        /// <summary>
+        /// What a radio of this generation on this band is typically running
+        /// when the beacon does not say. 2.4 GHz is capped at 20 MHz on purpose:
+        /// 40 MHz there is antisocial, frequently disabled, and rarely achieved.
+        /// </summary>
+        private static int EstimateWidth(WifiBand band, Dot11PhyType phy)
+        {
+            if (band == WifiBand.Band24) return 20;
+
+            switch (phy)
+            {
+                case Dot11PhyType.Eht: return band == WifiBand.Band6 ? 160 : 80;
+                case Dot11PhyType.He: return band == WifiBand.Band6 ? 160 : 80;
+                case Dot11PhyType.Vht: return 80;
+                case Dot11PhyType.Ht: return 40;
+                default: return 20;
+            }
+        }
+
+        /// <summary>
+        /// Typical busyness per band, used only when no AP on the channel
+        /// reports the real figure. These numbers are the honest content of what
+        /// used to be an arbitrary band bonus: 2.4 GHz is crowded, 6 GHz is
+        /// nearly empty, and that is the whole reason the bands rank as they do.
+        /// </summary>
+        private static double EstimateBusy(WifiBand band)
+        {
+            switch (band)
+            {
+                case WifiBand.Band6: return 0.08;
+                case WifiBand.Band5: return 0.25;
+                case WifiBand.Band24: return 0.60;
+                default: return 0.40;
+            }
+        }
+
+        private static double Clamp01(double v)
+        {
+            if (v < 0.0) return 0.0;
+            if (v > 1.0) return 1.0;
+            return v;
+        }
+
         public static int SignalBars(int rssiDbm)
         {
             if (rssiDbm >= -55) return 4;
