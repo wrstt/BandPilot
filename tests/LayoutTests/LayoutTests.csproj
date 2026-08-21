@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Deliberately not net8.0-windows: these checks are pure marshalling and
+         arithmetic, so they run anywhere and can gate a build on CI. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>LayoutTests</AssemblyName>
+    <RootNamespace>BandPilot.Tests</RootNamespace>
+    <NoWarn>CA1416;SYSLIB1054</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../src/Native/WlanApi.cs" />
+    <Compile Include="../../src/Wifi/BandTools.cs" />
+    <Compile Include="../../src/Wifi/AccessPoint.cs" />
+  </ItemGroup>
+
+</Project>

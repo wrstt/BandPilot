@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+dist/
+*.user
+*.suo
+
+# The published binary is ~68 MB. It belongs on a GitHub Release, not in git.
+*.exe
+*.pdb
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
