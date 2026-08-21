@@ -14,8 +14,17 @@ namespace BandPilot.Ui
     {
         private readonly MainWindow _shell;
         private WifiAdapter _adapter;
+        private string _instanceKey;
         private string _netAdapterName;
         private List<AdvancedProperty> _all = new List<AdvancedProperty>();
+
+        /// <summary>
+        /// Set when the band filter matched nothing and the table fell back to
+        /// showing everything. Kept as a field rather than by ticking the
+        /// checkbox, because writing to the checkbox left the user unable to
+        /// untick it on drivers whose keywords the filter does not recognise.
+        /// </summary>
+        private bool _filterFellBack;
 
         public AdapterPage(MainWindow shell)
         {
@@ -27,7 +36,11 @@ namespace BandPilot.Ui
         {
             if (adapter == null)
             {
-                SubHeader.Text = "No adapter selected.";
+                // Reachable if the user opens this page before the first scan
+                // has picked an adapter, so it explains itself rather than
+                // sitting blank.
+                SubHeader.Text = "Waiting for the Bands & APs page to select an adapter.";
+                Status("Open Bands & APs first, then come back.", "B.TextDim");
                 return;
             }
 
@@ -35,10 +48,19 @@ namespace BandPilot.Ui
             _adapter = adapter;
             SubHeader.Text = adapter.Description + " — settings read live from the driver.";
 
+            // The resolved Windows adapter name belongs to the previous radio.
+            // Keeping it would apply the next setting change to the wrong card.
+            if (changed) _netAdapterName = null;
+
             if (changed || _all.Count == 0) Load();
         }
 
         private async void Load()
+        {
+            await LoadAsync();
+        }
+
+        private async Task LoadAsync()
         {
             if (_adapter == null) return;
 
@@ -52,25 +74,28 @@ namespace BandPilot.Ui
             {
                 var loaded = await Task.Run(() =>
                 {
-                    string name = AdapterProperties.ResolveAdapterName(guid, desc);
-                    List<AdvancedProperty> props = name != null
-                        ? AdapterProperties.GetAdvanced(name)
+                    string key = AdapterRegistry.FindInstanceKey(guid, desc);
+                    List<AdvancedProperty> props = key != null
+                        ? AdapterRegistry.Read(key)
                         : new List<AdvancedProperty>();
-                    return new Tuple<string, List<AdvancedProperty>>(name, props);
+                    return new Tuple<string, List<AdvancedProperty>>(key, props);
                 });
 
-                _netAdapterName = loaded.Item1;
+                _instanceKey = loaded.Item1;
                 _all = loaded.Item2 ?? new List<AdvancedProperty>();
 
-                if (_netAdapterName == null)
+                if (_instanceKey == null)
                 {
-                    Status("Could not match this radio to a Windows network adapter.", "B.WarnText");
+                    Status("Could not find this radio's driver key in the registry. "
+                         + "The adapter may have been removed or disabled.", "B.WarnText");
                 }
                 else if (_all.Count == 0)
                 {
-                    // Common on Realtek and some MediaTek drivers, which expose
-                    // few or no advanced keywords. Not an error.
-                    Status("This driver exposes no adjustable settings.", "B.TextDim");
+                    // Normal on several Realtek and MediaTek drivers, which
+                    // publish few or no adjustable keywords. Not a failure.
+                    Status("This driver exposes no adjustable settings. That is normal for "
+                         + "some cards — band control on the Bands & APs page still works.",
+                           "B.TextDim");
                 }
                 else
                 {
@@ -81,7 +106,7 @@ namespace BandPilot.Ui
             }
             catch (Exception ex)
             {
-                Status(ex.Message, "B.Bad");
+                Status("Could not read driver settings: " + ex.Message, "B.Bad");
             }
             finally
             {
@@ -91,18 +116,27 @@ namespace BandPilot.Ui
 
         private void Bind()
         {
+            _filterFellBack = false;
+
             IEnumerable<AdvancedProperty> shown = ShowAll.IsChecked == true
                 ? _all
                 : _all.Where(p => p.IsBandRelated);
 
             List<AdvancedProperty> list = shown.ToList();
 
-            // If the filter leaves nothing, showing everything beats showing an
-            // empty table: vendors name these keywords inconsistently and the
-            // band filter cannot know every spelling.
-            if (list.Count == 0 && _all.Count > 0) list = _all.ToList();
+            // If the band filter leaves nothing, showing everything beats showing
+            // an empty table: vendors name these keywords inconsistently and the
+            // filter cannot know every spelling.
+            if (list.Count == 0 && _all.Count > 0)
+            {
+                list = _all.ToList();
+                _filterFellBack = true;
+            }
 
             SettingList.ItemsSource = list;
+            SettingCount.Text = _all.Count == 0
+                ? string.Empty
+                : (_filterFellBack ? "all " + _all.Count + " settings" : list.Count + " of " + _all.Count + " settings");
         }
 
         private void OnToggleAll(object sender, RoutedEventArgs e)
@@ -117,21 +151,61 @@ namespace BandPilot.Ui
             {
                 ChangeLabel.Text = "Select a setting to change it";
                 ValueBox.ItemsSource = null;
+                ValueBox.IsEditable = false;
                 BtnApply.IsEnabled = false;
                 return;
             }
 
             ChangeLabel.Text = "Change " + p.DisplayName + " to";
-            ValueBox.ItemsSource = p.ValidValues;
-            ValueBox.SelectedItem = p.DisplayValue;
-            BtnApply.IsEnabled = p.ValidValues != null && p.ValidValues.Count > 0;
+
+            if (p.ValidValues != null && p.ValidValues.Count > 0)
+            {
+                ValueBox.IsEditable = false;
+                ValueBox.ItemsSource = p.ValidValues;
+                ValueBox.SelectedItem = p.DisplayValue;
+            }
+            else
+            {
+                // Numeric and free-text parameters have no fixed value list, so
+                // the box has to accept typing or they could never be changed.
+                ValueBox.ItemsSource = null;
+                ValueBox.IsEditable = true;
+                ValueBox.Text = p.DisplayValue ?? string.Empty;
+            }
+
+            // Enabled only when a value can actually be produced. Previously this
+            // was always on, and a row whose current value was absent from its own
+            // enum left the box empty and the button silently inert.
+            BtnApply.IsEnabled = !string.IsNullOrEmpty(ChosenValue());
+            ValueBox.SelectionChanged -= OnValueChanged;
+            ValueBox.SelectionChanged += OnValueChanged;
+        }
+
+        private void OnValueChanged(object sender, SelectionChangedEventArgs e)
+        {
+            BtnApply.IsEnabled = !string.IsNullOrEmpty(ChosenValue());
+        }
+
+        private string ChosenValue()
+        {
+            if (ValueBox.IsEditable) return (ValueBox.Text ?? string.Empty).Trim();
+            return ValueBox.SelectedItem as string;
         }
 
         private void OnApply(object sender, RoutedEventArgs e)
         {
             AdvancedProperty p = SettingList.SelectedItem as AdvancedProperty;
-            string value = ValueBox.SelectedItem as string;
-            if (p == null || value == null || _netAdapterName == null) return;
+            string value = ChosenValue();
+            if (p == null)
+            {
+                Status("Select a setting first.", "B.WarnText");
+                return;
+            }
+            if (string.IsNullOrEmpty(value))
+            {
+                Status("Choose a value for " + p.DisplayName + " first.", "B.WarnText");
+                return;
+            }
 
             _shell.ShowConfirm(
                 "Change driver setting",
@@ -145,13 +219,39 @@ namespace BandPilot.Ui
         {
             Status("Applying…", "B.Accent");
             BtnApply.IsEnabled = false;
+
             try
             {
-                string name = _netAdapterName;
+                Guid guid = _adapter.Guid;
+                string desc = _adapter.Description;
                 string keyword = p.RegistryKeyword;
-                await Task.Run(() => AdapterProperties.SetAdvanced(name, keyword, value));
+
+                await Task.Run(() =>
+                {
+                    // Writing is still done through Set-NetAdapterAdvancedProperty
+                    // rather than the registry. A raw registry write does not take
+                    // effect until the adapter is restarted, and the cmdlet handles
+                    // that restart correctly; reading is the part that had no
+                    // reason to pay for a process launch.
+                    if (_netAdapterName == null)
+                    {
+                        _netAdapterName = AdapterProperties.ResolveAdapterName(guid, desc);
+                    }
+                    if (_netAdapterName == null)
+                    {
+                        throw new InvalidOperationException(
+                            "Could not match this radio to a Windows network adapter, so the "
+                            + "setting cannot be applied.");
+                    }
+                    AdapterProperties.SetAdvanced(_netAdapterName, keyword, value);
+                });
+
+                // Reload first, then report. Load() opens by writing "Reading
+                // driver settings…" to the same label, which used to wipe the
+                // success message in the same dispatcher pass and leave a
+                // successful apply looking like it did nothing.
+                await LoadAsync();
                 Status(p.DisplayName + " set to " + value + ".", "B.Good");
-                Load();
             }
             catch (Exception ex)
             {

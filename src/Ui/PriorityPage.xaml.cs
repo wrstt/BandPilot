@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -51,8 +52,17 @@ namespace BandPilot.Ui
         public void OnShown()
         {
             bool on = false;
-            try { on = QosManager.IsNlaBypassEnabled(); }
-            catch (Exception) { }
+            try
+            {
+                on = QosManager.IsNlaBypassEnabled();
+            }
+            catch (Exception ex)
+            {
+                // A failed read is not the same as "marking is off", and
+                // reporting it as off pins the orange banner up permanently on a
+                // machine where everything is fine.
+                Status("Could not check whether QoS marking is enabled: " + ex.Message, "B.WarnText");
+            }
             QosWarn.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
             Load();
         }
@@ -84,7 +94,11 @@ namespace BandPilot.Ui
             }
             catch (Exception ex)
             {
-                Status(ex.Message, "B.Bad");
+                // Without this the list stays empty AND the empty-state card
+                // stays collapsed, leaving a blank white rectangle and no clue.
+                RuleList.ItemsSource = null;
+                EmptyState.Visibility = Visibility.Visible;
+                Status("Could not read QoS policies: " + ex.Message, "B.Bad");
             }
         }
 
@@ -156,56 +170,93 @@ namespace BandPilot.Ui
             string proto = FProto.SelectedIndex == 1 ? "TCP" : FProto.SelectedIndex == 2 ? "UDP" : "*";
             string port = string.IsNullOrWhiteSpace(FPort.Text) ? "*" : FPort.Text.Trim();
 
+            Save(new QosRule
+            {
+                Name = FName.Text.Trim(),
+                Application = FApp.Text.Trim(),
+                Protocol = proto,
+                RemotePort = port,
+                Dscp = choice.Dscp,
+                ThrottleBytesPerSecond = throttle
+            });
+        }
+
+        private async void Save(QosRule rule)
+        {
             try
             {
-                QosManager.SaveRule(new QosRule
-                {
-                    Name = FName.Text.Trim(),
-                    Application = FApp.Text.Trim(),
-                    Protocol = proto,
-                    RemotePort = port,
-                    Dscp = choice.Dscp,
-                    ThrottleBytesPerSecond = throttle
-                });
-                QosManager.RefreshPolicy();
+                // The registry write is the part that matters and it is fast.
+                QosManager.SaveRule(rule);
                 Load();
-                Status("Saved.", "B.Good");
             }
             catch (Exception ex)
             {
-                Status(ex.Message, "B.Bad");
+                Status("Could not save: " + ex.Message, "B.Bad");
+                return;
             }
+
+            // gpupdate can take the better part of a minute. Running it on the
+            // dispatcher thread froze the whole window on every save, so it goes
+            // to the pool and the page stays live while it runs.
+            Status("Saved. Asking Windows to re-read its policy…", "B.TextDim");
+            string problem = await Task.Run(() => QosManager.RefreshPolicy());
+
+            Status(problem == null
+                ? "Saved and applied."
+                : "Saved, but the policy refresh failed, so this rule may not take effect until "
+                  + "you reboot. Windows said: " + problem,
+                problem == null ? "B.Good" : "B.WarnText");
         }
 
         private void OnDelete(object sender, RoutedEventArgs e)
         {
+            // Only ever deletes what is actually selected. Falling back to the
+            // rule-name box meant that after a save — which clears the selection
+            // but leaves the name typed — this offered to delete a policy the
+            // user was still editing, and reported success either way.
             QosRule r = RuleList.SelectedItem as QosRule;
-            string name = r != null ? r.Name : (FName.Text ?? string.Empty).Trim();
-            if (string.IsNullOrEmpty(name))
+            if (r == null)
             {
-                Status("Select a rule to delete.", "B.WarnText");
+                Status("Select a rule in the list above to delete it.", "B.WarnText");
                 return;
             }
 
+            string name = r.Name;
             _shell.ShowConfirm(
                 "Delete rule",
                 "Delete the rule \"" + name + "\"? Windows will stop applying it immediately.",
                 "Delete rule",
-                () =>
-                {
-                    try
-                    {
-                        QosManager.DeleteRule(name);
-                        QosManager.RefreshPolicy();
-                        Load();
-                        Status("Deleted.", "B.Good");
-                    }
-                    catch (Exception ex)
-                    {
-                        Status(ex.Message, "B.Bad");
-                    }
-                },
+                () => Delete(name),
                 true);
+        }
+
+        private async void Delete(string name)
+        {
+            bool removed;
+            try
+            {
+                removed = QosManager.DeleteRule(name);
+                Load();
+            }
+            catch (Exception ex)
+            {
+                Status("Could not delete: " + ex.Message, "B.Bad");
+                return;
+            }
+
+            if (!removed)
+            {
+                Status("No policy named \"" + name + "\" exists any more — the list has been "
+                     + "refreshed.", "B.WarnText");
+                return;
+            }
+
+            Status("Deleted. Asking Windows to re-read its policy…", "B.TextDim");
+            string problem = await Task.Run(() => QosManager.RefreshPolicy());
+            Status(problem == null
+                ? "Deleted."
+                : "Deleted, but the policy refresh failed: " + problem,
+                problem == null ? "B.Good" : "B.WarnText");
         }
 
         private void OnReload(object sender, RoutedEventArgs e)
@@ -223,23 +274,33 @@ namespace BandPilot.Ui
                 "Windows ignores priority rules on PCs that are not domain-joined until a "
                 + "registry switch is set. BandPilot will set it for you:",
                 "Enable QoS marking",
-                () =>
-                {
-                    try
-                    {
-                        QosManager.EnableNlaBypass();
-                        QosManager.RefreshPolicy();
-                        _shell.RefreshQosIndicator();
-                        OnShown();
-                    }
-                    catch (Exception ex)
-                    {
-                        Status(ex.Message, "B.Bad");
-                    }
-                },
+                () => EnableQos(),
                 false,
                 "A restart is needed before rules take effect.",
                 "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\QoS\n\"Do not use NLA\" = 1");
+        }
+
+        private async void EnableQos()
+        {
+            try
+            {
+                QosManager.EnableNlaBypass();
+                _shell.RefreshQosIndicator();
+                OnShown();
+            }
+            catch (Exception ex)
+            {
+                Status("Could not enable QoS marking: " + ex.Message, "B.Bad");
+                return;
+            }
+
+            Status("Enabled. Asking Windows to re-read its policy…", "B.TextDim");
+            string problem = await Task.Run(() => QosManager.RefreshPolicy());
+            Status(problem == null
+                ? "QoS marking enabled. Restart Windows before the rules take effect."
+                : "QoS marking enabled, but the policy refresh failed: " + problem
+                  + " A restart will apply it regardless.",
+                problem == null ? "B.Good" : "B.WarnText");
         }
 
         private void OnStarterGame(object sender, RoutedEventArgs e)

@@ -99,6 +99,11 @@ namespace BandPilot.Ui
             // Fires once during InitializeComponent, before the pages exist.
             if (PageHost == null) return;
 
+            // An ETW session is a machine-wide resource. Leaving it open while
+            // the user is on another page kept a kernel trace running, and the
+            // per-second timer ticking, for no benefit.
+            if (_monitor != null && sender != NavTraffic) _monitor.Suspend();
+
             if (sender == NavBands)
             {
                 if (_bands == null) _bands = new BandsPage(this);
@@ -202,6 +207,33 @@ namespace BandPilot.Ui
         // QoS switch
         // ------------------------------------------------------------------
 
+        private async void EnableQosMarking()
+        {
+            try
+            {
+                QosManager.EnableNlaBypass();
+                RefreshQosIndicator();
+                if (_priority != null) _priority.OnShown();
+            }
+            catch (Exception ex)
+            {
+                ShowNotice("Could not enable QoS marking", ex.Message);
+                return;
+            }
+
+            // Off the dispatcher thread: gpupdate is slow enough to look like a
+            // hang if it runs here.
+            string problem = await System.Threading.Tasks.Task.Run(
+                () => QosManager.RefreshPolicy());
+
+            if (problem != null)
+            {
+                ShowNotice("QoS marking enabled",
+                    "The switch is set, but Windows would not refresh its policy just now: "
+                    + problem + "\n\nRestarting will apply it regardless.");
+            }
+        }
+
         public void RefreshQosIndicator()
         {
             bool on = false;
@@ -230,20 +262,7 @@ namespace BandPilot.Ui
                 "Windows ignores priority rules on PCs that are not domain-joined until a "
                 + "registry switch is set. BandPilot will set it for you:",
                 "Enable QoS marking",
-                () =>
-                {
-                    try
-                    {
-                        QosManager.EnableNlaBypass();
-                        QosManager.RefreshPolicy();
-                        RefreshQosIndicator();
-                        if (_priority != null) _priority.OnShown();
-                    }
-                    catch (Exception ex)
-                    {
-                        ShowNotice("Could not enable QoS marking", ex.Message);
-                    }
-                },
+                () => EnableQosMarking(),
                 false,
                 "A restart is needed before rules take effect.",
                 "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\QoS\n\"Do not use NLA\" = 1");

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Microsoft.Win32;
 
 namespace BandPilot.Qos
@@ -117,12 +118,34 @@ namespace BandPilot.Qos
             }
         }
 
-        public static void DeleteRule(string name)
+        /// <returns>
+        /// True when a policy of that name existed and was removed. False means
+        /// there was nothing to delete, which the caller must not report as
+        /// success — a "Deleted." message for a rule that was never there is how
+        /// a stale list gets mistaken for a working one.
+        /// </returns>
+        public static bool DeleteRule(string name)
         {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+
             using (RegistryKey root = Registry.LocalMachine.OpenSubKey(PolicyRoot, true))
             {
-                if (root == null) return;
+                if (root == null) return false;
+
+                bool existed = false;
+                foreach (string existing in root.GetSubKeyNames())
+                {
+                    if (string.Equals(existing, name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        existed = true;
+                        name = existing;
+                        break;
+                    }
+                }
+                if (!existed) return false;
+
                 root.DeleteSubKeyTree(name, false);
+                return true;
             }
         }
 
@@ -137,7 +160,17 @@ namespace BandPilot.Qos
             using (RegistryKey k = Registry.LocalMachine.OpenSubKey(TcpipQos, false))
             {
                 if (k == null) return false;
-                return string.Equals(k.GetValue("Do not use NLA") as string, "1", StringComparison.Ordinal);
+
+                // Read the value whatever its type. Microsoft documents this as
+                // REG_SZ and that is what EnableNlaBypass writes, but plenty of
+                // tuning guides and .reg files set it as a DWORD. Treating those
+                // as "off" would leave the warning banner up forever on a machine
+                // where marking is in fact already enabled.
+                object raw = k.GetValue("Do not use NLA");
+                if (raw == null) return false;
+
+                string text = Convert.ToString(raw, CultureInfo.InvariantCulture);
+                return text != null && text.Trim() == "1";
             }
         }
 
@@ -151,19 +184,30 @@ namespace BandPilot.Qos
         }
 
         /// <summary>
-        /// Nudges the policy engine to re-read what we just wrote. Policies also
-        /// apply on their own at the next refresh or reboot; this just avoids
-        /// the wait.
+        /// Nudges the policy engine to re-read what was just written. The rule
+        /// itself is already on disk by this point, so a failure here is not
+        /// fatal — but it is worth telling the user about, because the symptom
+        /// (a saved rule that changes nothing until the next reboot) is
+        /// indistinguishable from the rule being wrong.
+        ///
+        /// This shells out to gpupdate and can take tens of seconds. Never call
+        /// it on the UI thread.
         /// </summary>
-        public static void RefreshPolicy()
+        /// <returns>Null when the refresh completed, otherwise why it did not.</returns>
+        public static string RefreshPolicy()
         {
             try
             {
-                Adapter.AdapterProperties.RunPowerShell("gpupdate /target:computer /force | Out-Null");
+                // Deliberately not /force: a full forced refresh reprocesses
+                // every policy on the machine and can take a minute, when all
+                // that is needed is for the QoS extension to re-read its keys.
+                Adapter.AdapterProperties.RunPowerShell(
+                    "gpupdate /target:computer | Out-Null", 45000);
+                return null;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // A refresh failure is not fatal - the policy is already on disk.
+                return ex.Message;
             }
         }
 

@@ -14,8 +14,12 @@
 
     <Grid Grid.Row="0">
       <TextBlock Text="Adapter" Style="{StaticResource T.PageTitle}"/>
-      <CheckBox x:Name="ShowAll" Style="{StaticResource Input.Check}" HorizontalAlignment="Right"
-                VerticalAlignment="Center" Content="Show every driver setting" Click="OnToggleAll"/>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <TextBlock x:Name="SettingCount" Style="{StaticResource T.Dim}" FontSize="11.5"
+                   Margin="0,0,14,0" VerticalAlignment="Center"/>
+        <CheckBox x:Name="ShowAll" Style="{StaticResource Input.Check}"
+                  VerticalAlignment="Center" Content="Show every driver setting" Click="OnToggleAll"/>
+      </StackPanel>
     </Grid>
 
     <TextBlock x:Name="SubHeader" Grid.Row="1" Style="{StaticResource T.Dim}" FontSize="12"

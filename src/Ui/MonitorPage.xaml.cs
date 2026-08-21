@@ -26,6 +26,7 @@ namespace BandPilot.Ui
         private readonly DispatcherTimer _tick;
         private BandwidthMonitor _monitor;
         private bool _running;
+        private int _ticks;
 
         public MonitorPage(MainWindow shell)
         {
@@ -50,11 +51,15 @@ namespace BandPilot.Ui
                 _monitor = new BandwidthMonitor();
                 if (!_monitor.Start())
                 {
-                    // Almost always a missing elevation token or the ETW session
-                    // already being held by another tool.
-                    Status("Could not open the ETW session. Run BandPilot as administrator, "
-                         + "and close other network monitors that may hold the kernel session.",
-                           "B.WarnText");
+                    // Almost always a missing elevation token or the session
+                    // already being held by another tool. The driver's own words
+                    // are far more useful than a generic message, so they lead.
+                    string why = _monitor.LastError;
+                    Status(string.IsNullOrEmpty(why)
+                        ? "Could not open the trace session. Run BandPilot as administrator, and "
+                          + "close other network monitors that may hold it."
+                        : "Could not open the trace session: " + why,
+                        "B.WarnText");
                     _monitor.Dispose();
                     _monitor = null;
                     return;
@@ -68,12 +73,25 @@ namespace BandPilot.Ui
             }
 
             _running = true;
+            _ticks = 0;
             BtnStart.Content = "Stop monitoring";
             OffState.Visibility = Visibility.Collapsed;
             TableHeader.Visibility = Visibility.Visible;
             Totals.Visibility = Visibility.Visible;
             Status(string.Empty, "B.TextDim");
             _tick.Start();
+        }
+
+        /// <summary>
+        /// Releases the trace session when the page is navigated away from,
+        /// while remembering that it was running so returning here can say so.
+        /// </summary>
+        public void Suspend()
+        {
+            if (!_running) return;
+            StopMonitoring();
+            Status("Monitoring stopped when you left the page — press Start to resume.",
+                   "B.TextDim");
         }
 
         public void StopMonitoring()
@@ -105,6 +123,9 @@ namespace BandPilot.Ui
             List<ProcessTraffic> data;
             try { data = _monitor.Sample(); }
             catch (Exception ex) { Status(ex.Message, "B.Bad"); return; }
+
+            _ticks++;
+            CheckHealth();
 
             long down = 0, up = 0;
             foreach (ProcessTraffic p in data)
@@ -139,6 +160,47 @@ namespace BandPilot.Ui
             if (keepPid >= 0)
             {
                 ProcList.SelectedItem = rows.FirstOrDefault(r => r.Pid == keepPid);
+            }
+        }
+
+        /// <summary>
+        /// A trace session can open successfully and then hear nothing — the
+        /// pump thread dies, or the provider yields no events. Both look exactly
+        /// like an idle network unless the difference is spelled out, which is
+        /// how this page could sit at zero with nothing to explain it.
+        /// </summary>
+        private void CheckHealth()
+        {
+            if (_monitor == null) return;
+
+            if (!_monitor.IsRunning)
+            {
+                string why = _monitor.LastError;
+                Status("The trace session stopped"
+                    + (string.IsNullOrEmpty(why) ? "." : ": " + why), "B.Bad");
+                StopMonitoring();
+                return;
+            }
+
+            if (_monitor.EventsSeen > 0)
+            {
+                if (_ticks < 30) Status(string.Empty, "B.TextDim");
+                return;
+            }
+
+            // Give it a few seconds before saying anything: a genuinely quiet
+            // machine takes a moment to produce its first packet.
+            if (_ticks == 5)
+            {
+                Status("Session open on " + _monitor.Mode
+                     + ", waiting for the first network event…", "B.TextDim");
+            }
+            else if (_ticks == 15)
+            {
+                Status("No network events after 15 seconds. The session is open on "
+                     + _monitor.Mode + " but receiving nothing — this usually means BandPilot "
+                     + "is not running elevated, or another tool holds the trace session.",
+                       "B.WarnText");
             }
         }
 

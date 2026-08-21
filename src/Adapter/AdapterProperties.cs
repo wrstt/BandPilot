@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Tasks;
 using System.Text.Json;
 
 namespace BandPilot.Adapter
@@ -49,7 +50,7 @@ namespace BandPilot.Adapter
         public static List<NetAdapterInfo> ListAdapters()
         {
             string json = RunPowerShell(
-                "Get-NetAdapter | Select-Object Name,InterfaceDescription,InterfaceGuid,Status | ConvertTo-Json -Compress");
+                "Get-NetAdapter -ErrorAction Stop | Select-Object Name,InterfaceDescription,InterfaceGuid,Status | ConvertTo-Json -Compress");
 
             var result = new List<NetAdapterInfo>();
             foreach (JsonElement el in EnumerateArray(json))
@@ -148,7 +149,13 @@ namespace BandPilot.Adapter
 
             JsonDocument doc;
             try { doc = JsonDocument.Parse(json); }
-            catch (JsonException) { yield break; }
+            catch (JsonException ex)
+            {
+                // Swallowing this turned malformed output into an empty list,
+                // which is indistinguishable from a genuine empty result.
+                throw new InvalidOperationException(
+                    "Could not read PowerShell's output: " + ex.Message);
+            }
 
             using (doc)
             {
@@ -190,6 +197,11 @@ namespace BandPilot.Adapter
         /// </summary>
         public static string RunPowerShell(string script)
         {
+            return RunPowerShell(script, 60000);
+        }
+
+        public static string RunPowerShell(string script, int timeoutMs)
+        {
             var psi = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
@@ -204,13 +216,33 @@ namespace BandPilot.Adapter
 
             using (var proc = Process.Start(psi))
             {
-                string stdout = proc.StandardOutput.ReadToEnd();
-                string stderr = proc.StandardError.ReadToEnd();
-                proc.WaitForExit(60000);
+                // Both pipes are drained concurrently. Reading one to the end
+                // before touching the other deadlocks as soon as the process
+                // writes more than a pipe buffer to the stream nobody is
+                // reading, and the timeout below never gets a chance to fire.
+                Task<string> stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                Task<string> stderrTask = proc.StandardError.ReadToEndAsync();
 
-                if (proc.ExitCode != 0 && !string.IsNullOrWhiteSpace(stderr))
+                if (!proc.WaitForExit(timeoutMs))
                 {
-                    throw new InvalidOperationException(stderr.Trim());
+                    try { proc.Kill(true); } catch (Exception) { }
+                    throw new TimeoutException(
+                        "PowerShell did not finish within " + (timeoutMs / 1000) + " seconds.");
+                }
+
+                string stdout = stdoutTask.GetAwaiter().GetResult();
+                string stderr = stderrTask.GetAwaiter().GetResult();
+
+                // Either signal is enough. powershell.exe exits 0 for
+                // non-terminating errors, so requiring both a bad exit code AND
+                // stderr meant a failed cmdlet came back as an empty result that
+                // looked exactly like "this driver has no settings".
+                if (proc.ExitCode != 0 || !string.IsNullOrWhiteSpace(stderr))
+                {
+                    string detail = string.IsNullOrWhiteSpace(stderr)
+                        ? "PowerShell exited with code " + proc.ExitCode + "."
+                        : stderr.Trim();
+                    throw new InvalidOperationException(detail);
                 }
                 return stdout;
             }

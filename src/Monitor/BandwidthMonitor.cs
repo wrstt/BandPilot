@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
 
@@ -46,8 +47,20 @@ namespace BandPilot.Monitor
         private volatile bool _running;
         private DateTime _lastSample = DateTime.UtcNow;
 
+        private long _eventsSeen;
+
         public string LastError { get; private set; }
         public bool IsRunning { get { return _running; } }
+
+        /// <summary>Which provider is supplying data, for diagnostics.</summary>
+        public string Mode { get; private set; }
+
+        /// <summary>
+        /// Events received since the session opened. Zero after a few seconds
+        /// means the session opened but is deaf, which looks identical to
+        /// "no traffic" unless the UI can tell them apart.
+        /// </summary>
+        public long EventsSeen { get { return Interlocked.Read(ref _eventsSeen); } }
 
         public bool Start()
         {
@@ -60,18 +73,11 @@ namespace BandPilot.Monitor
 
                 _session = new TraceEventSession(SessionName);
                 _session.StopOnDispose = true;
-                _session.EnableKernelProvider(KernelTraceEventParser.Keywords.NetworkTCPIP);
 
-                _session.Source.Kernel.TcpIpSend += d => Add(d.ProcessID, d.ProcessName, d.size, true);
-                _session.Source.Kernel.TcpIpRecv += d => Add(d.ProcessID, d.ProcessName, d.size, false);
-                _session.Source.Kernel.TcpIpSendIPV6 += d => Add(d.ProcessID, d.ProcessName, d.size, true);
-                _session.Source.Kernel.TcpIpRecvIPV6 += d => Add(d.ProcessID, d.ProcessName, d.size, false);
-                _session.Source.Kernel.UdpIpSend += d => Add(d.ProcessID, d.ProcessName, d.size, true);
-                _session.Source.Kernel.UdpIpRecv += d => Add(d.ProcessID, d.ProcessName, d.size, false);
-                _session.Source.Kernel.UdpIpSendIPV6 += d => Add(d.ProcessID, d.ProcessName, d.size, true);
-                _session.Source.Kernel.UdpIpRecvIPV6 += d => Add(d.ProcessID, d.ProcessName, d.size, false);
+                EnableABestProvider();
 
                 _running = true;
+                Interlocked.Exchange(ref _eventsSeen, 0);
                 _lastSample = DateTime.UtcNow;
 
                 _thread = new Thread(Pump);
@@ -91,6 +97,86 @@ namespace BandPilot.Monitor
             }
         }
 
+        /// <summary>
+        /// Exactly one provider is enabled, never both: they report the same
+        /// sends and receives, so enabling both would double every number.
+        ///
+        /// Microsoft-Windows-Kernel-Network is preferred because it is an
+        /// ordinary manifest provider. The classic kernel provider needs
+        /// KernelTraceControl.dll, which the NuGet package drops in an amd64
+        /// subfolder that single-file publish does not bundle — so on a released
+        /// build that path can fail while working perfectly from a dev build.
+        /// </summary>
+        private void EnableABestProvider()
+        {
+            try
+            {
+                _session.EnableProvider("Microsoft-Windows-Kernel-Network");
+                _session.Source.Dynamic.All += OnManifestEvent;
+                Mode = "Microsoft-Windows-Kernel-Network";
+                return;
+            }
+            catch (Exception manifestFailure)
+            {
+                try
+                {
+                    _session.EnableKernelProvider(KernelTraceEventParser.Keywords.NetworkTCPIP);
+                    HookClassicKernel();
+                    Mode = "classic kernel provider";
+                    return;
+                }
+                catch (Exception classicFailure)
+                {
+                    throw new InvalidOperationException(
+                        "Neither ETW network provider could be enabled. "
+                        + "Kernel-Network said: " + manifestFailure.Message
+                        + " Classic said: " + classicFailure.Message);
+                }
+            }
+        }
+
+        private void HookClassicKernel()
+        {
+            _session.Source.Kernel.TcpIpSend += d => Add(d.ProcessID, d.ProcessName, d.size, true);
+            _session.Source.Kernel.TcpIpRecv += d => Add(d.ProcessID, d.ProcessName, d.size, false);
+            _session.Source.Kernel.TcpIpSendIPV6 += d => Add(d.ProcessID, d.ProcessName, d.size, true);
+            _session.Source.Kernel.TcpIpRecvIPV6 += d => Add(d.ProcessID, d.ProcessName, d.size, false);
+            _session.Source.Kernel.UdpIpSend += d => Add(d.ProcessID, d.ProcessName, d.size, true);
+            _session.Source.Kernel.UdpIpRecv += d => Add(d.ProcessID, d.ProcessName, d.size, false);
+            _session.Source.Kernel.UdpIpSendIPV6 += d => Add(d.ProcessID, d.ProcessName, d.size, true);
+            _session.Source.Kernel.UdpIpRecvIPV6 += d => Add(d.ProcessID, d.ProcessName, d.size, false);
+        }
+
+        /// <summary>
+        /// Kernel-Network carries the owning PID and byte count in the payload.
+        /// The event's own ProcessID is the reporting context and is not
+        /// necessarily the process that owns the socket, so the payload wins.
+        /// </summary>
+        private void OnManifestEvent(TraceEvent data)
+        {
+            string name = data.EventName;
+            if (string.IsNullOrEmpty(name)) return;
+
+            bool sent = name.IndexOf("sent", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool received = !sent
+                && (name.IndexOf("recv", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("received", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!sent && !received) return;
+
+            int pid = AsInt(data.PayloadByName("PID"), data.ProcessID);
+            int size = AsInt(data.PayloadByName("size"), 0);
+            if (size <= 0) return;
+
+            Add(pid, null, size, sent);
+        }
+
+        private static int AsInt(object value, int fallback)
+        {
+            if (value == null) return fallback;
+            try { return Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture); }
+            catch (Exception) { return fallback; }
+        }
+
         private void Pump()
         {
             try
@@ -99,6 +185,8 @@ namespace BandPilot.Monitor
             }
             catch (Exception ex)
             {
+                // Start() has already returned true by now, so without this the
+                // failure is invisible: the table simply sits at zero forever.
                 LastError = ex.Message;
             }
             finally
@@ -110,6 +198,8 @@ namespace BandPilot.Monitor
         private void Add(int pid, string name, int size, bool sent)
         {
             if (pid <= 0 || size <= 0) return;
+
+            Interlocked.Increment(ref _eventsSeen);
 
             Counters c = _counters.GetOrAdd(pid, _ => new Counters { Name = name });
             if (string.IsNullOrEmpty(c.Name) && !string.IsNullOrEmpty(name)) c.Name = name;
@@ -183,6 +273,9 @@ namespace BandPilot.Monitor
         {
             _counters.Clear();
             _lastSample = DateTime.UtcNow;
+            // _eventsSeen is deliberately not cleared: it is a health signal for
+            // the session, not a traffic total, and resetting it would make a
+            // working session look dead.
         }
 
         public static string FormatRate(long bytesPerSecond)
