@@ -117,6 +117,7 @@
         <!-- Most people arrive here with no rules and no idea what to make, so
              the empty state offers two concrete starting points. -->
         <Border x:Name="EmptyState" Grid.Row="1" Visibility="Collapsed" Margin="16"
+                Background="{StaticResource B.Surface}"
                 CornerRadius="10" BorderThickness="1" BorderBrush="{StaticResource B.Hairline}">
           <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
             <TextBlock Text="Create your first rule" FontSize="13" FontWeight="SemiBold"

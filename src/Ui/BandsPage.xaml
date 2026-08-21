@@ -264,6 +264,7 @@
 
         <!-- empty state -->
         <Border x:Name="EmptyState" Grid.Row="1" Visibility="Collapsed" Margin="16"
+                Background="{StaticResource B.Surface}"
                 CornerRadius="10" BorderThickness="1" BorderBrush="{StaticResource B.Hairline}">
           <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
             <Path Style="{StaticResource Icon}" Data="{StaticResource I.WifiOff}"

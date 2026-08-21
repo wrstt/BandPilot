@@ -106,6 +106,7 @@
         </ListBox>
 
         <Border x:Name="OffState" Grid.Row="1" Margin="16" CornerRadius="10"
+                Background="{StaticResource B.Surface}"
                 BorderThickness="1" BorderBrush="{StaticResource B.Hairline}">
           <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
             <Path Style="{StaticResource Icon}" Data="{StaticResource I.Pulse}" Width="26" Height="26"

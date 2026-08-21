@@ -28,6 +28,15 @@ namespace BandPilot.Ui
         private bool _running;
         private int _ticks;
 
+        /// <summary>
+        /// The last message CheckHealth put on the status line. Health notices
+        /// have to be cleared when they stop being true, but the status line is
+        /// shared with messages the user triggered, and blanking it on a timer
+        /// wiped those before they could be read. Tracking what was written is
+        /// what makes "clear only my own text" possible.
+        /// </summary>
+        private string _healthMessage;
+
         public MonitorPage(MainWindow shell)
         {
             _shell = shell;
@@ -74,6 +83,7 @@ namespace BandPilot.Ui
 
             _running = true;
             _ticks = 0;
+            _healthMessage = null;
             BtnStart.Content = "Stop monitoring";
             OffState.Visibility = Visibility.Collapsed;
             TableHeader.Visibility = Visibility.Visible;
@@ -125,7 +135,12 @@ namespace BandPilot.Ui
             catch (Exception ex) { Status(ex.Message, "B.Bad"); return; }
 
             _ticks++;
-            CheckHealth();
+
+            // CheckHealth can tear the page down. Without this bail-out the rest
+            // of Sample carried on and repainted the rows and totals it had just
+            // cleared, leaving the "Monitoring is off" card sitting on top of a
+            // live-looking table.
+            if (!CheckHealth()) return;
 
             long down = 0, up = 0;
             foreach (ProcessTraffic p in data)
@@ -169,39 +184,52 @@ namespace BandPilot.Ui
         /// like an idle network unless the difference is spelled out, which is
         /// how this page could sit at zero with nothing to explain it.
         /// </summary>
-        private void CheckHealth()
+        /// <returns>False when the session was stopped and the caller must not
+        /// keep painting.</returns>
+        private bool CheckHealth()
         {
-            if (_monitor == null) return;
+            if (_monitor == null) return false;
 
             if (!_monitor.IsRunning)
             {
                 string why = _monitor.LastError;
                 Status("The trace session stopped"
                     + (string.IsNullOrEmpty(why) ? "." : ": " + why), "B.Bad");
+                _healthMessage = null;
                 StopMonitoring();
-                return;
+                return false;
             }
 
             if (_monitor.EventsSeen > 0)
             {
-                if (_ticks < 30) Status(string.Empty, "B.TextDim");
-                return;
+                // Clear only what this method wrote. The null test matters: once
+                // cleared, comparing "" to "" would match every tick and wipe the
+                // user's own messages, which is the bug this replaced.
+                if (_healthMessage != null && StatusLine.Text == _healthMessage)
+                {
+                    Status(string.Empty, "B.TextDim");
+                }
+                _healthMessage = null;
+                return true;
             }
 
             // Give it a few seconds before saying anything: a genuinely quiet
             // machine takes a moment to produce its first packet.
             if (_ticks == 5)
             {
-                Status("Session open on " + _monitor.Mode
-                     + ", waiting for the first network event…", "B.TextDim");
+                _healthMessage = "Session open on " + _monitor.Mode
+                               + ", waiting for the first network event…";
+                Status(_healthMessage, "B.TextDim");
             }
             else if (_ticks == 15)
             {
-                Status("No network events after 15 seconds. The session is open on "
-                     + _monitor.Mode + " but receiving nothing — this usually means BandPilot "
-                     + "is not running elevated, or another tool holds the trace session.",
-                       "B.WarnText");
+                _healthMessage = "No network events after 15 seconds. The session is open on "
+                               + _monitor.Mode + " but receiving nothing — this usually means "
+                               + "BandPilot is not running elevated, or another tool holds the "
+                               + "trace session.";
+                Status(_healthMessage, "B.WarnText");
             }
+            return true;
         }
 
         private void OnReset(object sender, RoutedEventArgs e)
