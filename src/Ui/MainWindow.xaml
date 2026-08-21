@@ -80,6 +80,8 @@
                            Content="Priority &amp; limits" Tag="{StaticResource I.Sliders}" Checked="OnNavChecked"/>
               <RadioButton x:Name="NavTraffic" Style="{StaticResource NavItem}" GroupName="nav"
                            Content="Live traffic" Tag="{StaticResource I.Pulse}" Checked="OnNavChecked"/>
+              <RadioButton x:Name="NavGame" Style="{StaticResource NavItem}" GroupName="nav"
+                           Content="Game mode" Tag="{StaticResource I.Game}" Checked="OnNavChecked"/>
               <RadioButton x:Name="NavAbout" Style="{StaticResource NavItem}" GroupName="nav"
                            Content="About" Tag="{StaticResource I.Info}" Checked="OnNavChecked"/>
             </StackPanel>

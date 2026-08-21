@@ -16,9 +16,9 @@
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Product>BandPilot</Product>
-    <Description>Wi-Fi band and access-point control for Intel AX/BE and other modern Wi-Fi adapters</Description>
+    <Description>Wi-Fi band, airtime and traffic control for Intel AX/BE and other modern Wi-Fi adapters</Description>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <ApplicationIcon></ApplicationIcon>

@@ -24,6 +24,16 @@
       <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"
                  Text="Choosing a radio applies to the current connection. It survives until the adapter roams, the radio resets, or you reconnect. The Adapter page holds the standing preferences that make it stick — lowering Roaming Aggressiveness is what stops Windows drifting back. Some drivers treat a preferred access point as a hint rather than a rule, and will still roam under a weak signal; that is driver behaviour an application cannot override."/>
 
+      <TextBlock Text="WHAT THE RATING MEANS" Style="{StaticResource T.Kicker}"
+                 Foreground="{DynamicResource B.Accent}" Margin="0,20,0,0"/>
+      <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"
+                 Text="The rating is throughput potential, gated by whether the link will actually hold: signal, plus channel width and free airtime, scaled down as the signal weakens. Width and busyness are read from the access point's own beacon where it publishes them — the BUSY column shows the AP's own measurement of how much of the time its channel is occupied, which catches interference and slow legacy clients that no signal reading can see. Where a beacon is silent, the band is used to estimate both. That is the honest content of what used to be a flat bonus for 5 and 6 GHz. It also means wider is not automatically better: a congested 320 MHz radio loses to a quiet 80 MHz one, which is usually the right answer."/>
+
+      <TextBlock Text="GAME MODE" Style="{StaticResource T.Kicker}"
+                 Foreground="{DynamicResource B.Accent}" Margin="0,20,0,0"/>
+      <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"
+                 Text="Game mode is interruption suppression, not a frame-rate booster — measured gains from tools of this kind are low single digits and often zero. It eases background apps off the CPU and memory so an updater cannot steal them mid-match. It never stops a Windows service: that is the highest-consequence and lowest-payoff thing such tools do, and half the plausible targets restart themselves anyway. Nearly everything it changes is a kernel object that dies with the process, so a crash undoes it automatically. The two settings that would survive a reboot are written to a journal before they are changed, and replayed on next launch if the session ended badly. Running BandPilot.exe --restore replays that journal without opening the window."/>
+
       <TextBlock Text="QOS CAVEATS" Style="{StaticResource T.Kicker}"
                  Foreground="{DynamicResource B.Accent}" Margin="0,20,0,0"/>
       <TextBlock Style="{StaticResource T.Secondary}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="19"
@@ -31,7 +41,7 @@
 
       <Border Height="1" Background="{DynamicResource B.Hairline}" Margin="0,22,0,0"/>
       <TextBlock Style="{StaticResource T.Dim}" FontSize="11.5" TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="17"
-                 Text="BandPilot v1.1.0 — independent software built on publicly documented Windows APIs. It contains no Intel code, is not derived from Intel Killer Performance Suite, and is not endorsed by or affiliated with Intel Corporation. Intel and Killer are trademarks of their respective owners, used only to describe compatibility."/>
+                 Text="BandPilot v1.2.0 — independent software built on publicly documented Windows APIs. It contains no Intel code, is not derived from Intel Killer Performance Suite, and is not endorsed by or affiliated with Intel Corporation. Intel and Killer are trademarks of their respective owners, used only to describe compatibility."/>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

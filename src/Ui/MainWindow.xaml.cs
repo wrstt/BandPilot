@@ -15,6 +15,7 @@ namespace BandPilot.Ui
         private AdapterPage _adapter;
         private PriorityPage _priority;
         private MonitorPage _monitor;
+        private GamePage _game;
         private AboutPage _about;
 
         private Action _modalConfirm;
@@ -100,6 +101,11 @@ namespace BandPilot.Ui
         protected override void OnClosed(EventArgs e)
         {
             if (_monitor != null) _monitor.StopMonitoring();
+
+            // Game mode holds machine-wide state. Releasing it is the single
+            // most important thing that has to happen on the way out.
+            if (_game != null) _game.ShutDown();
+
             if (_bands != null) _bands.Shutdown();
             if (_wifi != null) _wifi.Dispose();
             base.OnClosed(e);
@@ -140,6 +146,12 @@ namespace BandPilot.Ui
             {
                 if (_monitor == null) _monitor = new MonitorPage(this);
                 PageHost.Content = _monitor;
+            }
+            else if (sender == NavGame)
+            {
+                if (_game == null) _game = new GamePage(this);
+                PageHost.Content = _game;
+                _game.OnShown();
             }
             else if (sender == NavAbout)
             {

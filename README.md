@@ -36,7 +36,11 @@ Intel AX200/AX201/AX210/AX211 and BE200/BE201/BE202, plus the Realtek, MediaTek 
 ### Bands & APs — the main event
 Every BSS (one entry per AP radio) grouped by network, showing band, channel, signal, Wi-Fi generation and BSSID. Pick one, click connect, and you are pinned to that exact radio.
 
-The **Rating** column is an opinionated guide rather than raw signal strength. Signal is worth only 60 of the 100 points, because a 2.4 GHz radio at -50 dBm is usually *slower* in practice than a 6 GHz one at -70 dBm — 2.4 GHz is narrow and crowded. Letting raw RSSI dominate would recommend exactly the wrong radio, which is the mistake this tool exists to prevent.
+The **Rating** column is throughput potential, not signal strength — signal, plus channel width and free airtime, scaled down as the signal weakens so an unreachable radio scores nothing.
+
+Width and busyness are read from each access point's own beacon. Windows hands you that data as an opaque blob and exposes nothing from it, but it holds the two numbers that matter most after signal. The **BUSY** column is the AP's own measurement of how much of the time its channel is occupied — the most honest congestion figure available anywhere, because it counts airtime lost to hidden nodes, interference and slow legacy clients, none of which a signal reading can detect. Plenty of consumer routers never send it, so absence reads as *unknown* rather than as zero.
+
+The consequence worth knowing: **wider is not better when busy.** An 80 MHz channel only transmits when all four of its 20 MHz subchannels are clear, so a congested 320 MHz radio deservedly loses to a quiet 80 MHz one.
 
 When you are on a lower-ranked radio than one available, the banner says so in plain words and offers a one-click switch. That contradiction — full signal bars on the third-best radio in the building — is the whole argument for the app.
 
@@ -45,6 +49,20 @@ The driver's own radio settings, read live from the installed driver. Nothing is
 
 ### Priority & limits
 Per-application traffic prioritisation and bandwidth caps, implemented as standard Windows QoS policies written straight to the registry — so they work on Home editions, which have no `gpedit.msc`. DSCP is presented as a ranked 1–7 scale rather than raw numbers, because DSCP `8` is *lower* priority than `0` and reads as a mistake otherwise.
+
+### Game mode
+Eases background apps off the CPU and memory so an updater cannot steal them mid-match, and reverses everything when the game exits.
+
+It is **interruption suppression, not a frame-rate booster** — measured gains from tools of this kind are low single digits and frequently zero. It is worth being blunt about that, because the category is full of software that promises otherwise.
+
+It never stops a Windows service. That is the highest-consequence, lowest-payoff thing these tools do: half the plausible targets are trigger-started and simply come back, stopping the wrong one leaves a visibly broken machine, and stopping `WlanSvc` would break BandPilot itself.
+
+The safety property is structural rather than procedural. Nearly everything it does is a job object or per-process throttling state that the kernel destroys when BandPilot's process ends — on a clean exit, a crash, or a kill. Exactly two changes survive a reboot (a machine-wide registry value and the active power scheme); those are written to a journal *before* they are applied and replayed on next launch if the session ended badly. Your own power plans are never edited — a private copy is made and deleted afterwards.
+
+```powershell
+BandPilot.exe --restore
+```
+replays that journal headlessly, so a stuck machine has a one-line fix without the GUI.
 
 ### Live traffic
 Per-process upload and download rates via an ETW kernel session. Windows exposes no per-process network performance counter, so listening to kernel TCP/IP events is the only way to attribute bytes to a PID. Select a process and jump straight to creating a priority rule for it.
@@ -113,6 +131,9 @@ src/
   Wifi/WifiService.cs      Scanning, BSS enumeration, BSSID-pinned connect
   Wifi/AdapterCapability.cs  What the driver says the card can do
   Wifi/BandTools.cs        Frequency to band/channel, rating, formatting
+  Wifi/InformationElements.cs  Beacon parsing: channel width, BSS Load
+  Wifi/RoamingHold.cs      Non-disruptive roaming brakes
+  Game/                    Game mode, its journal and its safety rails
   Adapter/                 Driver settings via the NetAdapter PowerShell module
   Qos/QosManager.cs        Windows QoS policy read/write
   Monitor/                 ETW per-process bandwidth accounting

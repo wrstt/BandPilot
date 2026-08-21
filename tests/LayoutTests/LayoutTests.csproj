@@ -21,6 +21,9 @@
     <Compile Include="../../src/Wifi/InformationElements.cs" />
     <Compile Include="../../src/Adapter/AdapterProperties.cs" />
     <Compile Include="../../src/Adapter/RoamingLock.cs" />
+    <Compile Include="../../src/Game/SessionJournal.cs" />
+    <Compile Include="../../src/Game/GameNative.cs" />
+    <Compile Include="../../src/Game/ProtectedProcesses.cs" />
   </ItemGroup>
 
 </Project>

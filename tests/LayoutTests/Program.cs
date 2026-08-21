@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using BandPilot.Native;
 using BandPilot.Adapter;
+using BandPilot.Game;
 using BandPilot.Wifi;
 
 namespace BandPilot.Tests
@@ -38,6 +39,7 @@ namespace BandPilot.Tests
             RoamingLockRules();
             SignalHistoryRules();
             BeaconParsing();
+            GameModeSafety();
 
             Console.WriteLine();
             Console.WriteLine(_failures == 0
@@ -372,6 +374,94 @@ namespace BandPilot.Tests
                 at += part.Length;
             }
             return result;
+        }
+
+        /// <summary>
+        /// Game Mode is the only feature here that changes machine-wide state,
+        /// so its safety properties are asserted rather than assumed. Each of
+        /// these corresponds to a specific way tools in this category leave
+        /// people with a subtly broken machine.
+        /// </summary>
+        private static void GameModeSafety()
+        {
+            Section("Game mode - job object flags");
+
+            // THE rule. JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE inverts the safety
+            // property of a job object: instead of limits evaporating when
+            // BandPilot dies, every background process the user had open would
+            // be killed along with it. The flag is not even declared, so it
+            // cannot be set by a typo.
+            var flagValues = (GameNative.CpuRateControlFlags[])
+                Enum.GetValues(typeof(GameNative.CpuRateControlFlags));
+            Eq("only two rate-control flags exist at all", flagValues.Length, 2);
+            Bool("no flag has the KILL_ON_JOB_CLOSE bit (0x2000)",
+                Array.TrueForAll(flagValues, f => ((uint)f & 0x2000) == 0), true);
+
+            uint used = (uint)(GameNative.CpuRateControlFlags.Enable
+                             | GameNative.CpuRateControlFlags.WeightBased);
+            Eq("the flags used are Enable|WeightBased", (long)used, 3);
+
+            // Weight-based sharing, never a hard cap: a hard cap can stall a
+            // process holding a lock the game is waiting on.
+            Bool("weight-based sharing is requested",
+                (used & (uint)GameNative.CpuRateControlFlags.WeightBased) != 0, true);
+
+            Section("Game mode - restore decisions");
+
+            // The classic bug: restoring a value that never existed by writing
+            // zero. That changes the effective default and leaves the setting
+            // altered forever in a way the user never chose.
+            var neverExisted = new Mutation { Existed = false, PriorData = null };
+            Bool("a value that did not exist is DELETED, not zeroed",
+                neverExisted.Action == RestoreAction.Delete, true);
+
+            var hadValue = new Mutation { Existed = true, PriorData = "10" };
+            Bool("a value that existed is written back",
+                hadValue.Action == RestoreAction.Write, true);
+
+            // A prior of zero is still a prior. Treating "0" as "absent" would
+            // delete a value the user deliberately set.
+            var priorZero = new Mutation { Existed = true, PriorData = "0" };
+            Bool("a prior value of zero is restored, not deleted",
+                priorZero.Action == RestoreAction.Write, true);
+
+            Section("Game mode - session expiry");
+
+            SessionJournal fresh = SessionJournal.Begin(TimeSpan.FromHours(12));
+            Bool("a new session is not expired", fresh.IsExpired, false);
+            Bool("a session records the owning process", fresh.Pid == Environment.ProcessId, true);
+            Eq("a new session has no mutations yet", fresh.Mutations.Count, 0);
+
+            SessionJournal past = SessionJournal.Begin(TimeSpan.FromHours(-1));
+            Bool("a session past its expiry is restorable", past.IsExpired, true);
+
+            // An unreadable expiry has to fail towards restoring. The opposite
+            // would leave a corrupt journal stranding machine state forever.
+            var corrupt = new SessionJournal { HardExpiryUtc = "not a date" };
+            Bool("an unreadable expiry is treated as expired", corrupt.IsExpired, true);
+
+            var missing = new SessionJournal { HardExpiryUtc = null };
+            Bool("a missing expiry is treated as expired", missing.IsExpired, true);
+
+            Section("Game mode - protected processes");
+
+            // Throttling any of these produces a visibly broken desktop.
+            string[] mustProtect = { "csrss", "wininit", "winlogon", "services", "lsass",
+                                     "dwm", "explorer", "audiodg" };
+            foreach (string name in mustProtect)
+            {
+                Bool("never throttles " + name, ProtectedProcesses.Contains(name), true);
+            }
+
+            // Throttling ourselves would have the tool slow down the tool.
+            Bool("never throttles BandPilot itself",
+                ProtectedProcesses.Contains("BandPilot"), true);
+            Bool("matching ignores case", ProtectedProcesses.Contains("ExPlOrEr"), true);
+
+            // ...but the list must stay narrow, or Game Mode does nothing at all.
+            Bool("an ordinary app is not protected",
+                ProtectedProcesses.Contains("chrome"), false);
+            Bool("a null name is handled", ProtectedProcesses.Contains(null), false);
         }
 
         private static void Bool(string what, bool actual, bool expected)
